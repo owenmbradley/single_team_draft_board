@@ -26,6 +26,18 @@ export class RoomsApiError extends Error {
   }
 }
 
+function readErrorMessage(body: unknown, fallback: string): string {
+  if (!body || typeof body !== 'object') return fallback;
+  const record = body as { error?: unknown; message?: unknown };
+  if (typeof record.error === 'string' && record.error.trim()) return record.error;
+  if (record.error && typeof record.error === 'object') {
+    const nested = (record.error as { message?: unknown }).message;
+    if (typeof nested === 'string' && nested.trim()) return nested;
+  }
+  if (typeof record.message === 'string' && record.message.trim()) return record.message;
+  return fallback;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -35,11 +47,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     },
   });
-  const body = (await response.json().catch(() => ({}))) as { error?: string } & T;
+  const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new RoomsApiError(body.error ?? 'The room server could not complete that.', response.status);
+    throw new RoomsApiError(readErrorMessage(body, 'The room server could not complete that.'), response.status);
   }
-  return body;
+  return body as T;
 }
 
 export function listRooms(): Promise<{ rooms: PublicRoom[] }> {

@@ -65,7 +65,7 @@ describe('draft board app', () => {
       root?.render(<App />);
     });
     const local = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Use this device only'),
+      button.textContent?.includes('Try a sandbox'),
     );
     if (!local) throw new Error(`missing local mode: ${container.textContent}`);
     await act(async () => {
@@ -123,6 +123,14 @@ describe('draft board app', () => {
     expect(container.textContent).toContain('Tripod 2026');
     expect(container.textContent).toContain('7K2MQX');
     expect(container.textContent).not.toContain('Who is still on the board');
+  });
+
+  it('opens a sandbox trial that is not written to localStorage', async () => {
+    await renderBoard();
+    expect(container.textContent).toContain('Sandbox trial');
+    expect(container.textContent).toContain('not saved when you close the browser');
+    expect(container.textContent).toContain('Who is still on the board');
+    expect(storage.getItem(STORAGE_KEY)).toBeNull();
   });
 
   it('seeds the pool and records a last-minute add to the team on the clock', async () => {

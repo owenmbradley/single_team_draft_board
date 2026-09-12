@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { DoorOpen, Plus, Users } from 'lucide-react';
+import { DoorOpen, FlaskConical, Plus } from 'lucide-react';
 import { Field, inputClass, primaryButtonClass, secondaryButtonClass } from '@/components/Dialog';
 import { createRoom, joinRoom, listRooms, RoomsApiError, type PublicRoom, type RoomPayload } from '@/lib/roomsApi';
 
 type RoomLobbyProps = {
   onEnterRoom: (payload: RoomPayload) => void;
-  onUseLocal: () => void;
+  onEnterSandbox: () => void;
 };
 
 function formatUpdated(value: string): string {
@@ -14,7 +14,7 @@ function formatUpdated(value: string): string {
   return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-export function RoomLobby({ onEnterRoom, onUseLocal }: RoomLobbyProps) {
+export function RoomLobby({ onEnterRoom, onEnterSandbox }: RoomLobbyProps) {
   const [rooms, setRooms] = useState<PublicRoom[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [joinPassword, setJoinPassword] = useState('');
@@ -30,7 +30,7 @@ export function RoomLobby({ onEnterRoom, onUseLocal }: RoomLobbyProps) {
       setRooms(result.rooms);
     } catch (caught) {
       setRooms([]);
-      setError(caught instanceof RoomsApiError ? caught.message : 'Could not load rooms.');
+      setError(caught instanceof RoomsApiError ? caught.message : 'Could not load the room list.');
     } finally {
       setLoading(false);
     }
@@ -183,10 +183,15 @@ export function RoomLobby({ onEnterRoom, onUseLocal }: RoomLobbyProps) {
 
         {error && <p className="text-sm font-semibold text-coral">{error}</p>}
 
-        <button type="button" className={`${secondaryButtonClass} w-full`} onClick={onUseLocal}>
-          <Users className="size-4" />
-          Use this device only
-        </button>
+        <div>
+          <button type="button" className={`${secondaryButtonClass} w-full`} onClick={onEnterSandbox}>
+            <FlaskConical className="size-4" />
+            Try a sandbox
+          </button>
+          <p className="mt-2 text-center text-xs font-medium text-slate-500">
+            A practice board on this tab only. It is not saved when you close the browser.
+          </p>
+        </div>
       </div>
     </main>
   );

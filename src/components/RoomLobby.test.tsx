@@ -47,7 +47,7 @@ describe('room lobby', () => {
 
   it('shows available rooms without opening them', async () => {
     await act(async () => {
-      root?.render(<RoomLobby onEnterRoom={() => undefined} onUseLocal={() => undefined} />);
+      root?.render(<RoomLobby onEnterRoom={() => undefined} onEnterSandbox={() => undefined} />);
     });
     await act(async () => {
       await Promise.resolve();

@@ -38,3 +38,7 @@ export function saveSession(session: DraftSession): void {
   if (!storage) return;
   storage.setItem(STORAGE_KEY, JSON.stringify(session));
 }
+
+export function clearSavedSession(): void {
+  memory()?.removeItem(STORAGE_KEY);
+}

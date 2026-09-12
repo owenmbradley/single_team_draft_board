@@ -32,14 +32,12 @@ import { normalizeName } from '@/lib/ratings';
 import { lastFilledPick } from '@/lib/correctPick';
 import { canExportDraft, downloadDraftExport, isDraftComplete } from '@/lib/exportDraft';
 import { createSeededSession, createStore, playerById, reduceSession } from '@/lib/session';
-import { loadSession, saveSession } from '@/lib/storage';
+import { clearSavedSession } from '@/lib/storage';
 import { useRoomSync } from '@/lib/useRoomSync';
 import type { ImportResult, PlayerInput } from '@/types';
 
 export default function App() {
-  const [store, dispatch] = useReducer(reduceSession, undefined, () =>
-    createStore(loadSession() ?? createSeededSession()),
-  );
+  const [store, dispatch] = useReducer(reduceSession, undefined, () => createStore(createSeededSession()));
   const { session, past } = store;
   const [query, setQuery] = useState('');
   const [pool, setPool] = useState<PoolView>('available');
@@ -60,10 +58,6 @@ export default function App() {
   );
   const [room, setRoom] = useState<RoomConnection | null>(null);
   const { commit, setVersion } = useRoomSync(room, dispatch);
-
-  useEffect(() => {
-    if (gate === 'board' && !room) saveSession(session);
-  }, [session, gate, room]);
 
   useEffect(() => {
     const existing = loadRoomConnection();
@@ -126,10 +120,15 @@ export default function App() {
     setGate('board');
   };
 
+  const enterSandbox = () => {
+    clearSavedSession();
+    dispatch({ type: 'hydrate', session: createSeededSession() });
+    setGate('board');
+  };
+
   const leaveRoom = () => {
     clearRoomConnection();
     setRoom(null);
-    dispatch({ type: 'hydrate', session: loadSession() ?? createSeededSession() });
     setGate('lobby');
   };
 
@@ -191,7 +190,7 @@ export default function App() {
   }
 
   if (gate === 'lobby') {
-    return <RoomLobby onEnterRoom={enterRoom} onUseLocal={() => setGate('board')} />;
+    return <RoomLobby onEnterRoom={enterRoom} onEnterSandbox={enterSandbox} />;
   }
 
   return (
@@ -207,7 +206,7 @@ export default function App() {
             <div className="min-w-0 leading-tight">
               <p className="truncate font-display text-sm tracking-wide">{session.name}</p>
               <p className="truncate text-[9px] font-semibold uppercase tracking-[.16em] text-slate-400">
-                {room ? `Room ${room.id} · shared` : 'This device only'}
+                {room ? `Room ${room.id} · shared` : 'Sandbox · not saved'}
               </p>
             </div>
           </div>
@@ -279,6 +278,15 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {!room && (
+        <div className="border-b border-gold/30 bg-[#fff6db] px-4 py-2.5 text-center sm:px-6">
+          <p className="text-sm font-semibold text-ice">
+            Sandbox trial — this board stays in this tab only. It is not saved when you close the
+            browser or leave this space.
+          </p>
+        </div>
+      )}
 
       <section className="border-b bg-ice-2 text-white">
         <div className="mx-auto max-w-[1500px] px-4 py-2 sm:px-6 lg:px-8">

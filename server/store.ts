@@ -1,5 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { Redis } from '@upstash/redis';
+import { resolve } from 'node:path';
 import type { SessionStore } from '../src/lib/session';
 
 export type RoomRecord = {
@@ -53,48 +53,10 @@ class MemoryRoomStore implements RoomStore {
   }
 }
 
-class FileRoomStore implements RoomStore {
-  private readonly filePath: string;
-
-  constructor(filePath: string) {
-    this.filePath = filePath;
-  }
-
-  private async readAll(): Promise<Record<string, RoomRecord>> {
-    try {
-      const raw = await readFile(this.filePath, 'utf8');
-      const parsed = JSON.parse(raw) as Record<string, RoomRecord>;
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch {
-      return {};
-    }
-  }
-
-  private async writeAll(rooms: Record<string, RoomRecord>): Promise<void> {
-    await mkdir(dirname(this.filePath), { recursive: true });
-    await writeFile(this.filePath, JSON.stringify(rooms), 'utf8');
-  }
-
-  async list() {
-    return Object.values(await this.readAll()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }
-
-  async get(id: string) {
-    const rooms = await this.readAll();
-    return rooms[id] ?? null;
-  }
-
-  async save(room: RoomRecord) {
-    const rooms = await this.readAll();
-    rooms[room.id] = room;
-    await this.writeAll(rooms);
-  }
-}
-
 class KvRoomStore implements RoomStore {
-  private readonly kv: { get<T>(key: string): Promise<T | null>; set(key: string, value: unknown): Promise<unknown> };
+  private readonly kv: Redis;
 
-  constructor(kv: { get<T>(key: string): Promise<T | null>; set(key: string, value: unknown): Promise<unknown> }) {
+  constructor(kv: Redis) {
     this.kv = kv;
   }
 
@@ -127,7 +89,6 @@ export async function getRoomStore(): Promise<RoomStore> {
   if (cached) return cached;
 
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    const { Redis } = await import('@upstash/redis');
     cached = new KvRoomStore(Redis.fromEnv());
     return cached;
   }
@@ -137,6 +98,7 @@ export async function getRoomStore(): Promise<RoomStore> {
     return cached;
   }
 
+  const { FileRoomStore } = await import('./fileStore');
   cached = new FileRoomStore(resolve(process.cwd(), process.env.ROOMS_DATA_PATH ?? '.data/rooms.json'));
   return cached;
 }
