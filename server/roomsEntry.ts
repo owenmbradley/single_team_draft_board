@@ -1,6 +1,4 @@
-import { runVercelApi } from './_lib/vercel';
-
-export const config = { runtime: 'nodejs' };
+import { runVercelApi } from '../api/_lib/vercel';
 
 export default async function handler(
   req: { method?: string; url?: string; headers: { host?: string; authorization?: string | string[] }; body?: unknown },

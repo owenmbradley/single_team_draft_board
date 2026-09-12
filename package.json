@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && npm run build:api",
+    "build:api": "esbuild server/roomsEntry.ts --bundle --platform=node --format=cjs --outfile=api/_bundle/handler.cjs --external:@upstash/redis",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -24,6 +25,7 @@
     "@types/react-dom": "^19.1.9",
     "@vercel/node": "^13.0.0",
     "@vitejs/plugin-react": "^5.0.2",
+    "esbuild": "^0.25.0",
     "jsdom": "^26.1.0",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
