@@ -1,3 +1,1 @@
-import { runVercelApi } from '../../server/vercel';
-
-export default runVercelApi;
+export { config, default } from '../rooms';

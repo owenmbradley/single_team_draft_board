@@ -1,6 +1,9 @@
-import { Redis } from '@upstash/redis';
-import { resolve } from 'node:path';
-import type { SessionStore } from '../src/lib/session';
+import type { DraftSession } from '../src/types';
+
+export type SessionStore = {
+  session: DraftSession;
+  past: DraftSession[];
+};
 
 export type RoomRecord = {
   id: string;
@@ -54,9 +57,12 @@ class MemoryRoomStore implements RoomStore {
 }
 
 class KvRoomStore implements RoomStore {
-  private readonly kv: Redis;
+  private readonly kv: {
+    get<T>(key: string): Promise<T | null>;
+    set(key: string, value: unknown): Promise<unknown>;
+  };
 
-  constructor(kv: Redis) {
+  constructor(kv: { get<T>(key: string): Promise<T | null>; set(key: string, value: unknown): Promise<unknown> }) {
     this.kv = kv;
   }
 
@@ -89,6 +95,7 @@ export async function getRoomStore(): Promise<RoomStore> {
   if (cached) return cached;
 
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const { Redis } = await import('@upstash/redis');
     cached = new KvRoomStore(Redis.fromEnv());
     return cached;
   }
@@ -99,6 +106,7 @@ export async function getRoomStore(): Promise<RoomStore> {
   }
 
   const { FileRoomStore } = await import('./fileStore');
+  const { resolve } = await import('node:path');
   cached = new FileRoomStore(resolve(process.cwd(), process.env.ROOMS_DATA_PATH ?? '.data/rooms.json'));
   return cached;
 }

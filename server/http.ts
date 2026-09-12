@@ -1,5 +1,3 @@
-import { createRoomService, RoomError } from './service';
-import { getRoomStore } from './store';
 import type { SessionAction } from '../src/lib/session';
 
 export type ApiRequest = {
@@ -25,14 +23,18 @@ function asObject(body: unknown): Record<string, unknown> {
 
 export async function handleApi(request: ApiRequest): Promise<ApiResponse> {
   try {
-    const service = createRoomService(await getRoomStore());
     const path = request.pathname.replace(/\/+$/, '') || '/';
     const method = request.method.toUpperCase();
     const body = asObject(request.body);
 
     if (method === 'GET' && path === '/api/rooms') {
-      return { status: 200, body: { rooms: await service.list() } };
+      const { getRoomStore, toPublicRoom } = await import('./store');
+      const rooms = (await (await getRoomStore()).list()).map(toPublicRoom);
+      return { status: 200, body: { rooms } };
     }
+
+    const { createRoomService } = await import('./service');
+    const service = createRoomService(await (await import('./store')).getRoomStore());
 
     if (method === 'POST' && path === '/api/rooms') {
       return {
@@ -64,10 +66,12 @@ export async function handleApi(request: ApiRequest): Promise<ApiResponse> {
 
     return { status: 404, body: { error: 'Not found.' } };
   } catch (caught) {
+    const { RoomError } = await import('./service');
     if (caught instanceof RoomError) {
       return { status: caught.status, body: { error: caught.message } };
     }
+    const message = caught instanceof Error ? caught.message : 'The room server failed.';
     console.error(caught);
-    return { status: 500, body: { error: 'The room server failed.' } };
+    return { status: 500, body: { error: message } };
   }
 }
