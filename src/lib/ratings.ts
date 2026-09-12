@@ -1,4 +1,4 @@
-import type { Position } from '@/types';
+import type { Position } from '../types';
 
 export const MIN_RATING = 1;
 export const MAX_RATING = 5;

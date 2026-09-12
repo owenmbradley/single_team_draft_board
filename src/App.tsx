@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import { ClipboardList, Download, PenLine, Plus, Settings2, Undo2, Upload, Users } from 'lucide-react';
+import { ClipboardList, Download, LogOut, PenLine, Plus, Settings2, Undo2, Upload, Users } from 'lucide-react';
 import { AddPlayerDialog } from '@/components/AddPlayerDialog';
 import { AvailableList } from '@/components/AvailableList';
 import { ImportDialog } from '@/components/ImportDialog';
@@ -7,9 +7,17 @@ import { PickBoard } from '@/components/PickBoard';
 import { PlanningBoard } from '@/components/PlanningBoard';
 import { RosterPanel } from '@/components/RosterPanel';
 import { CorrectPicksDialog } from '@/components/CorrectPicksDialog';
+import { RoomLobby } from '@/components/RoomLobby';
 import { SetupDialog } from '@/components/SetupDialog';
 import { TeamRosterDialog } from '@/components/TeamRosterDialog';
 import { primaryButtonClass, secondaryButtonClass } from '@/components/Dialog';
+import {
+  clearRoomConnection,
+  loadRoomConnection,
+  saveRoomConnection,
+  type RoomConnection,
+} from '@/lib/roomConnection';
+import { readRoom, type RoomPayload } from '@/lib/roomsApi';
 import { ourUpcomingPicks, teamForPick } from '@/lib/draftOrder';
 import { parsePlayerWorkbook } from '@/lib/importPlayers';
 import {
@@ -25,6 +33,7 @@ import { lastFilledPick } from '@/lib/correctPick';
 import { canExportDraft, downloadDraftExport, isDraftComplete } from '@/lib/exportDraft';
 import { createSeededSession, createStore, playerById, reduceSession } from '@/lib/session';
 import { loadSession, saveSession } from '@/lib/storage';
+import { useRoomSync } from '@/lib/useRoomSync';
 import type { ImportResult, PlayerInput } from '@/types';
 
 export default function App() {
@@ -46,10 +55,38 @@ export default function App() {
   const [view, setView] = useState<'draft' | 'plan'>('draft');
   const [correctionMode, setCorrectionMode] = useState(false);
   const [correctPickNumber, setCorrectPickNumber] = useState<number | null>(null);
+  const [gate, setGate] = useState<'lobby' | 'board' | 'rejoining'>(() =>
+    loadRoomConnection() ? 'rejoining' : 'lobby',
+  );
+  const [room, setRoom] = useState<RoomConnection | null>(null);
+  const { commit, setVersion } = useRoomSync(room, dispatch);
 
   useEffect(() => {
-    saveSession(session);
-  }, [session]);
+    if (gate === 'board' && !room) saveSession(session);
+  }, [session, gate, room]);
+
+  useEffect(() => {
+    const existing = loadRoomConnection();
+    if (!existing) return undefined;
+    let cancelled = false;
+    void readRoom(existing.id, existing.token)
+      .then((payload) => {
+        if (cancelled) return;
+        dispatch({ type: 'hydrate', session: payload.session });
+        setRoom({ id: payload.id, name: payload.name, token: payload.token });
+        setVersion(payload.version);
+        setGate('board');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        clearRoomConnection();
+        setRoom(null);
+        setGate('lobby');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [setVersion]);
 
   useEffect(() => {
     if (!session.teams.some((team) => team.id === captainTeamId && !team.isUs)) {
@@ -80,8 +117,24 @@ export default function App() {
   const exportReady = canExportDraft(session);
   const draftDone = isDraftComplete(session);
 
+  const enterRoom = (payload: RoomPayload) => {
+    const connection = { id: payload.id, name: payload.name, token: payload.token };
+    saveRoomConnection(connection);
+    setRoom(connection);
+    setVersion(payload.version);
+    dispatch({ type: 'hydrate', session: payload.session });
+    setGate('board');
+  };
+
+  const leaveRoom = () => {
+    clearRoomConnection();
+    setRoom(null);
+    dispatch({ type: 'hydrate', session: loadSession() ?? createSeededSession() });
+    setGate('lobby');
+  };
+
   const recordClockPick = (playerId: string) => {
-    dispatch({ type: 'recordPick', playerId, teamId: onClock.id });
+    commit({ type: 'recordPick', playerId, teamId: onClock.id });
     setSelectedId(null);
   };
 
@@ -101,17 +154,17 @@ export default function App() {
   };
 
   const correctAssignment = (pickNumber: number, playerId: string) => {
-    dispatch({ type: 'correctPick', pickNumber, playerId });
+    commit({ type: 'correctPick', pickNumber, playerId });
   };
 
   const clearAssignment = (pickNumber: number) => {
-    dispatch({ type: 'clearPick', pickNumber });
+    commit({ type: 'clearPick', pickNumber });
   };
 
   const markCaptain = (playerId: string) => {
     const team = session.teams.find((item) => item.id === captainTeamId);
     if (!team || team.isUs) return;
-    dispatch({ type: 'markCaptain', playerId, teamId: team.id });
+    commit({ type: 'markCaptain', playerId, teamId: team.id });
     setSelectedId(null);
   };
 
@@ -120,7 +173,7 @@ export default function App() {
       (player) => normalizeName(player.name) === normalizeName(input.name),
     );
     if (exists) return false;
-    dispatch({ type: 'addPlayer', input });
+    commit({ type: 'addPlayer', input });
     return true;
   };
 
@@ -128,6 +181,18 @@ export default function App() {
     const buffer = await file.arrayBuffer();
     return parsePlayerWorkbook(buffer);
   };
+
+  if (gate === 'rejoining') {
+    return (
+      <main className="grid min-h-screen place-items-center bg-rink text-ice">
+        <p className="font-semibold text-slate-500">Opening room…</p>
+      </main>
+    );
+  }
+
+  if (gate === 'lobby') {
+    return <RoomLobby onEnterRoom={enterRoom} onUseLocal={() => setGate('board')} />;
+  }
 
   return (
     <main className="min-h-screen bg-rink text-ice">
@@ -142,7 +207,7 @@ export default function App() {
             <div className="min-w-0 leading-tight">
               <p className="truncate font-display text-sm tracking-wide">{session.name}</p>
               <p className="truncate text-[9px] font-semibold uppercase tracking-[.16em] text-slate-400">
-                Single-team draft room
+                {room ? `Room ${room.id} · shared` : 'This device only'}
               </p>
             </div>
           </div>
@@ -151,7 +216,7 @@ export default function App() {
               type="button"
               className={headerActionClass}
               disabled={past.length === 0}
-              onClick={() => dispatch({ type: 'undo' })}
+              onClick={() => commit({ type: 'undo' })}
             >
               <Undo2 className="size-3.5" />
               Undo
@@ -203,6 +268,14 @@ export default function App() {
               <Settings2 className="size-3.5" />
               Setup
             </button>
+            <button
+              type="button"
+              className={headerActionClass}
+              onClick={() => (room ? leaveRoom() : setGate('lobby'))}
+            >
+              <LogOut className="size-3.5" />
+              {room ? 'Leave' : 'Rooms'}
+            </button>
           </div>
         </div>
       </header>
@@ -222,7 +295,7 @@ export default function App() {
                 correctionMode={correctionMode}
                 onOpenTeam={setRosterTeamId}
                 onCorrectPick={openCorrectMenu}
-                onMoveTeam={(teamId, direction) => dispatch({ type: 'reorderTeam', teamId, direction })}
+                onMoveTeam={(teamId, direction) => commit({ type: 'reorderTeam', teamId, direction })}
               />
             </div>
           )}
@@ -283,7 +356,7 @@ export default function App() {
             onPosition={setPosition}
             onSort={changeSort}
             onSelect={setSelectedId}
-            onEdit={(id, patch) => dispatch({ type: 'editPlayer', id, input: patch })}
+            onEdit={(id, patch) => commit({ type: 'editPlayer', id, input: patch })}
             onBackToDraft={() => setView('draft')}
           />
         </div>
@@ -320,10 +393,10 @@ export default function App() {
               onRecordPick={recordClockPick}
               onMarkCaptain={markCaptain}
               onRestore={(id) => {
-                dispatch({ type: 'restorePlayer', playerId: id });
+                commit({ type: 'restorePlayer', playerId: id });
               }}
               onSelect={setSelectedId}
-              onEdit={(id, patch) => dispatch({ type: 'editPlayer', id, input: patch })}
+              onEdit={(id, patch) => commit({ type: 'editPlayer', id, input: patch })}
             />
           </div>
         </div>
@@ -335,7 +408,7 @@ export default function App() {
           onClose={() => setDialog(null)}
           onPreview={previewImport}
           onImport={(result, mode) => {
-            dispatch({ type: 'importPlayers', players: result.players, mode });
+            commit({ type: 'importPlayers', players: result.players, mode });
             setDialog(null);
             setView('plan');
           }}
@@ -365,7 +438,7 @@ export default function App() {
           session={session}
           onClose={() => setDialog(null)}
           onSave={(next) => {
-            dispatch({
+            commit({
               type: 'configure',
               name: next.name,
               teamCount: next.teamCount,
@@ -376,11 +449,11 @@ export default function App() {
           }}
           onResetPicks={() => {
             if (!window.confirm('Clear every pick and keep the player ratings? Captains stay marked.')) return;
-            dispatch({ type: 'resetPicks' });
+            commit({ type: 'resetPicks' });
           }}
           onClearPlayers={() => {
             if (!window.confirm('Remove every player from this draft session?')) return;
-            dispatch({ type: 'clearPlayers' });
+            commit({ type: 'clearPlayers' });
             setView('draft');
             setDialog(null);
           }}

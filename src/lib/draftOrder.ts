@@ -1,4 +1,4 @@
-import type { DraftSession, DraftType, Player, Team } from '@/types';
+import type { DraftSession, DraftType, Player, Team } from '../types';
 
 export function draftRounds(playerCount: number, teamCount: number): number {
   const teams = Math.max(1, Math.round(teamCount));

@@ -1,6 +1,5 @@
-import type { DraftSession, ParsedPlayer, Player, PlayerInput } from '@/types';
-import { createId } from '@/lib/ids';
-import { applyPickCorrection, clearPickAssignment } from '@/lib/correctPick';
+import type { DraftSession, ParsedPlayer, Player, PlayerInput } from '../types';
+import { applyPickCorrection, clearPickAssignment } from './correctPick';
 import {
   buildTeams,
   draftRounds,
@@ -10,9 +9,10 @@ import {
   normalizeDraftType,
   ourTeam,
   type MoveDirection,
-} from '@/lib/draftOrder';
-import { clampRating, normalizeName } from '@/lib/ratings';
-import { SEED_PLAYERS } from '@/lib/seedPlayers';
+} from './draftOrder';
+import { createId } from './ids';
+import { clampRating, normalizeName } from './ratings';
+import { SEED_PLAYERS } from './seedPlayers';
 
 export type SessionAction =
   | { type: 'hydrate'; session: DraftSession }

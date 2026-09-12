@@ -1,5 +1,5 @@
-import { maxPicks, teamForPick } from '@/lib/draftOrder';
-import type { DraftSession, Player, Team } from '@/types';
+import type { DraftSession, Player, Team } from '../types';
+import { maxPicks, teamForPick } from './draftOrder';
 
 export function lastFilledPick(players: Player[]): number {
   return players.reduce((highest, player) => Math.max(highest, player.pickNumber ?? 0), 0);

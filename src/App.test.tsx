@@ -2,9 +2,10 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '@/App';
 import { TEMPLATE_CSV } from '@/lib/importPlayers';
+import { ROOM_CONNECTION_KEY } from '@/lib/roomConnection';
 import { STORAGE_KEY } from '@/lib/storage';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -59,9 +60,26 @@ describe('draft board app', () => {
   let container: HTMLDivElement;
   let storage: MemoryStorage;
 
+  async function renderBoard() {
+    await act(async () => {
+      root?.render(<App />);
+    });
+    const local = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Use this device only'),
+    );
+    if (!local) throw new Error(`missing local mode: ${container.textContent}`);
+    await act(async () => {
+      local.click();
+    });
+  }
+
   beforeEach(() => {
     storage = new MemoryStorage();
     Object.defineProperty(window, 'localStorage', { value: storage, configurable: true });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ rooms: [] }), { headers: { 'Content-Type': 'application/json' } })),
+    );
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -71,12 +89,44 @@ describe('draft board app', () => {
     act(() => root?.unmount());
     container.remove();
     storage.removeItem(STORAGE_KEY);
+    storage.removeItem(ROOM_CONNECTION_KEY);
+    vi.unstubAllGlobals();
   });
 
-  it('seeds the pool and records a last-minute add to the team on the clock', async () => {
+  it('opens on a lobby that lists rooms', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            rooms: [
+              {
+                id: '7K2MQX',
+                name: 'Tripod 2026',
+                playerCount: 80,
+                pickCount: 2,
+                updatedAt: '2026-09-12T01:00:00.000Z',
+              },
+            ],
+          }),
+          { headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
     await act(async () => {
       root?.render(<App />);
     });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(container.textContent).toContain('Choose a draft');
+    expect(container.textContent).toContain('Tripod 2026');
+    expect(container.textContent).toContain('7K2MQX');
+    expect(container.textContent).not.toContain('Who is still on the board');
+  });
+
+  it('seeds the pool and records a last-minute add to the team on the clock', async () => {
+    await renderBoard();
 
     expect(container.textContent).toContain('Who is still on the board');
     expect(container.textContent).toContain('James Whitby');
@@ -145,9 +195,7 @@ describe('draft board app', () => {
   });
 
   it('opens a team roster popup and toggles the main list to taken players', async () => {
-    await act(async () => {
-      root?.render(<App />);
-    });
+    await renderBoard();
 
     const search = container.querySelector('input[placeholder="Filter names..."]');
     if (!(search instanceof HTMLInputElement)) throw new Error('missing search');
@@ -186,9 +234,7 @@ describe('draft board app', () => {
   });
 
   it('lists captains above picks on a team roster card', async () => {
-    await act(async () => {
-      root?.render(<App />);
-    });
+    await renderBoard();
 
     const search = container.querySelector('input[placeholder="Filter names..."]');
     if (!(search instanceof HTMLInputElement)) throw new Error('missing search');
@@ -233,9 +279,7 @@ describe('draft board app', () => {
   });
 
   it('corrects a past pick without moving later assignments', async () => {
-    await act(async () => {
-      root?.render(<App />);
-    });
+    await renderBoard();
 
     const search = container.querySelector('input[placeholder="Filter names..."]');
     if (!(search instanceof HTMLInputElement)) throw new Error('missing search');
@@ -313,9 +357,7 @@ describe('draft board app', () => {
   });
 
   it('lets you rate a player in Plan and keeps the rating on the draft board', async () => {
-    await act(async () => {
-      root?.render(<App />);
-    });
+    await renderBoard();
 
     const plan = Array.from(container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Plan'),
@@ -377,9 +419,7 @@ describe('draft board app', () => {
   });
 
   it('opens planning after an import', async () => {
-    await act(async () => {
-      root?.render(<App />);
-    });
+    await renderBoard();
 
     const importButton = Array.from(container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Import'),
@@ -419,9 +459,7 @@ describe('draft board app', () => {
   });
 
   it('lets you change the draft order with on-screen arrows before picks start', async () => {
-    await act(async () => {
-      root?.render(<App />);
-    });
+    await renderBoard();
 
     expect(container.querySelector('ol li button')?.getAttribute('aria-label')).toBe('Team 1 roster');
 
