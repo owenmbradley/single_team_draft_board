@@ -33,7 +33,7 @@ export async function handleApi(request: ApiRequest): Promise<ApiResponse> {
 
     if (method === 'GET' && path === '/api/rooms') {
       const rooms = (await store.list()).map(toPublicRoom);
-      return { status: 200, body: { rooms } };
+      return { status: 200, body: { rooms, storage: store.kind } };
     }
 
     if (method === 'POST' && path === '/api/rooms') {

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && npm run build:api",
-    "build:api": "esbuild server/roomsEntry.ts --bundle --platform=node --format=cjs --outfile=api/_bundle/handler.cjs --external:@upstash/redis",
+    "build:api": "esbuild server/roomsEntry.ts --bundle --platform=node --format=cjs --outfile=api/_bundle/handler.cjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -17,6 +17,7 @@ export type RoomRecord = {
 };
 
 export type RoomStore = {
+  kind: 'redis' | 'memory' | 'file';
   list(): Promise<RoomRecord[]>;
   get(id: string): Promise<RoomRecord | null>;
   save(room: RoomRecord): Promise<void>;
@@ -40,7 +41,15 @@ export function toPublicRoom(room: RoomRecord): PublicRoom {
   };
 }
 
+function redisCredentials(): { url: string; token: string } | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim() || process.env.KV_REST_API_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim() || process.env.KV_REST_API_TOKEN?.trim();
+  if (!url || !token) return null;
+  return { url, token };
+}
+
 class MemoryRoomStore implements RoomStore {
+  readonly kind = 'memory' as const;
   private rooms = new Map<string, RoomRecord>();
 
   async list() {
@@ -57,6 +66,7 @@ class MemoryRoomStore implements RoomStore {
 }
 
 class KvRoomStore implements RoomStore {
+  readonly kind = 'redis' as const;
   private readonly kv: {
     get<T>(key: string): Promise<T | null>;
     set(key: string, value: unknown): Promise<unknown>;
@@ -94,19 +104,17 @@ let cached: RoomStore | undefined;
 export async function getRoomStore(): Promise<RoomStore> {
   if (cached) return cached;
 
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    try {
-      const { Redis } = await import('@upstash/redis');
-      cached = new KvRoomStore(Redis.fromEnv());
-      return cached;
-    } catch (caught) {
-      console.error('Redis unavailable, using memory store.', caught);
-    }
+  const credentials = redisCredentials();
+  if (credentials) {
+    const { Redis } = await import('@upstash/redis');
+    cached = new KvRoomStore(new Redis(credentials));
+    return cached;
   }
 
   if (process.env.VERCEL) {
-    cached = new MemoryRoomStore();
-    return cached;
+    throw new Error(
+      'Room storage is not configured. In Vercel, connect Upstash Redis and set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN (or KV_REST_API_URL and KV_REST_API_TOKEN), then redeploy.',
+    );
   }
 
   const { FileRoomStore } = await import('./fileStore');

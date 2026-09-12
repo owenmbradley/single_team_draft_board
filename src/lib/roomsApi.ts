@@ -54,7 +54,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function listRooms(): Promise<{ rooms: PublicRoom[] }> {
+export function listRooms(): Promise<{ rooms: PublicRoom[]; storage?: string }> {
   return request('/api/rooms');
 }
 

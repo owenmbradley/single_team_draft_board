@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import type { RoomRecord, RoomStore } from './store';
 
 export class FileRoomStore implements RoomStore {
+  readonly kind = 'file' as const;
   private readonly filePath: string;
 
   constructor(filePath: string) {

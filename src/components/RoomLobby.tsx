@@ -28,6 +28,11 @@ export function RoomLobby({ onEnterRoom, onEnterSandbox }: RoomLobbyProps) {
     try {
       const result = await listRooms();
       setRooms(result.rooms);
+      if (result.storage === 'memory') {
+        setError(
+          'Rooms are only in memory right now. Connect Upstash Redis in Vercel or they will disappear on redeploy.',
+        );
+      }
     } catch (caught) {
       setRooms([]);
       setError(caught instanceof RoomsApiError ? caught.message : 'Could not load the room list.');

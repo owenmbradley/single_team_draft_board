@@ -18,6 +18,6 @@ describe('rooms http', () => {
       body: {},
     });
     expect(result.status).toBe(200);
-    expect(result.body).toEqual({ rooms: expect.any(Array) });
+    expect(result.body).toEqual({ rooms: expect.any(Array), storage: 'file' });
   });
 });
