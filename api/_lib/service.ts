@@ -2,7 +2,7 @@ import { createRoomId, normalizeRoomId } from './ids';
 import { hashPassword, verifyPassword } from './password';
 import { toPublicRoom, type PublicRoom, type RoomRecord, type RoomStore } from './store';
 import { issueRoomToken, readRoomToken } from './token';
-import { createSession, createStore, reduceSession, type SessionAction } from '../../src/lib/session';
+import { createSession, createStore, reduceSession, type SessionAction } from './session';
 
 const ALLOWED_ACTIONS = new Set<SessionAction['type']>([
   'configure',

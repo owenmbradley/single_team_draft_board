@@ -1,4 +1,4 @@
-import type { SessionAction } from '../../src/lib/session';
+import type { SessionAction } from './session';
 import { createRoomService, RoomError } from './service';
 import { getRoomStore, toPublicRoom } from './store';
 

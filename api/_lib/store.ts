@@ -1,4 +1,4 @@
-import type { DraftSession } from '../../src/types';
+import type { DraftSession } from './types';
 
 export type SessionStore = {
   session: DraftSession;
@@ -95,9 +95,13 @@ export async function getRoomStore(): Promise<RoomStore> {
   if (cached) return cached;
 
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    const { Redis } = await import('@upstash/redis');
-    cached = new KvRoomStore(Redis.fromEnv());
-    return cached;
+    try {
+      const { Redis } = await import('@upstash/redis');
+      cached = new KvRoomStore(Redis.fromEnv());
+      return cached;
+    } catch (caught) {
+      console.error('Redis unavailable, using memory store.', caught);
+    }
   }
 
   if (process.env.VERCEL) {
