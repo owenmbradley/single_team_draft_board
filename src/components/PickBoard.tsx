@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, History } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { maxPicks, teamForPick, type MoveDirection } from '@/lib/draftOrder';
 import { teamPicks } from '@/lib/listPlayers';
 import type { DraftSession } from '@/types';
@@ -34,10 +34,6 @@ export function PickBoard({
       .map((player) => [player.pickNumber as number, player]),
   );
   const onClockId = teamForPick(session.teams, session.currentPick, session.draftType).team.id;
-  const recent = session.players
-    .filter((player) => player.pickNumber != null)
-    .sort((a, b) => (b.pickNumber ?? 0) - (a.pickNumber ?? 0))
-    .slice(0, 4);
   const canEditOrder = Boolean(onMoveTeam);
   const [editingOrder, setEditingOrder] = useState(false);
   const teams = [...session.teams].sort((a, b) => a.slot - b.slot);
@@ -157,39 +153,6 @@ export function PickBoard({
           {session.draftType === 'linear' ? 'Linear' : 'Snake'} · {session.teams.length} · {session.rounds}r
         </span>
       </div>
-
-      {recent.length > 0 && (
-        <div className="flex min-w-0 items-center gap-2">
-          <p className="eyebrow flex shrink-0 items-center gap-1 text-slate-400">
-            <History className="size-3" />
-            Recent
-          </p>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5">
-            {recent.map((player) => {
-              const team = session.teams.find((item) => item.id === player.draftedByTeamId);
-              return (
-                <button
-                  key={player.id}
-                  type="button"
-                  className="inline-flex items-center gap-1.5 text-left text-xs text-white hover:text-mint"
-                  onClick={() => {
-                    if (correctionMode && onCorrectPick && player.pickNumber != null) {
-                      onCorrectPick(player.pickNumber);
-                      return;
-                    }
-                    if (team) onOpenTeam(team.id);
-                  }}
-                >
-                  <span className="font-semibold">{player.name}</span>
-                  <span className="text-[10px] text-slate-400">
-                    #{player.pickNumber} · {team?.name}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </section>
   );
 }
