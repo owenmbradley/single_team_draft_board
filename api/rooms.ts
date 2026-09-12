@@ -1,3 +1,5 @@
+import { runVercelApi } from './_lib/vercel';
+
 export const config = { runtime: 'nodejs' };
 
 export default async function handler(
@@ -5,7 +7,6 @@ export default async function handler(
   res: { status: (code: number) => { json: (body: unknown) => unknown } },
 ) {
   try {
-    const { runVercelApi } = await import('../server/vercel');
     await runVercelApi(req, res);
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : 'The room server failed.';
