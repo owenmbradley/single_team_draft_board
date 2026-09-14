@@ -4,11 +4,22 @@ import { overall } from '@/lib/ratings';
 export type SortKey = 'overall' | 'talent' | 'vibes' | 'name' | 'position' | 'classYear';
 export type SortDir = 'asc' | 'desc';
 export type PositionFilter = 'ALL' | Position;
+export type ClassFilter = 'ALL' | string;
 export type PoolView = 'available' | 'taken';
 export type StatusFilter = PlayerStatus | 'all' | 'taken';
 
 export function defaultSortDir(sortKey: SortKey): SortDir {
   return sortKey === 'name' || sortKey === 'position' || sortKey === 'classYear' ? 'asc' : 'desc';
+}
+
+export function classYearOptions(players: Player[]): string[] {
+  return [
+    ...new Set(
+      players
+        .map((player) => player.classYear.trim())
+        .filter((year) => year.length > 0),
+    ),
+  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
 export function comparePlayers(a: Player, b: Player, sortKey: SortKey, sortDir: SortDir): number {
@@ -39,16 +50,19 @@ export function filterPlayers(
   options: {
     query: string;
     position: PositionFilter;
+    classYear?: ClassFilter;
     status: StatusFilter;
     sortKey: SortKey;
     sortDir: SortDir;
   },
 ): Player[] {
   const query = options.query.trim().toLowerCase();
+  const classYear = options.classYear ?? 'ALL';
 
   return players
     .filter((player) => matchesStatus(player, options.status))
     .filter((player) => options.position === 'ALL' || player.position === options.position)
+    .filter((player) => classYear === 'ALL' || player.classYear.trim() === classYear)
     .filter(
       (player) =>
         !query ||

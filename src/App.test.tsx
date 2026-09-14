@@ -187,7 +187,7 @@ describe('draft board app', () => {
       false,
     );
 
-    const picked = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Picked');
+    const picked = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Mark Picked');
     if (!picked) throw new Error('missing picked');
     await act(async () => {
       picked.click();
@@ -211,7 +211,7 @@ describe('draft board app', () => {
       setInputValue(search, 'James Whitby');
     });
 
-    const picked = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Picked');
+    const picked = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Mark Picked');
     if (!picked) throw new Error('missing picked');
     await act(async () => {
       picked.click();
@@ -249,7 +249,7 @@ describe('draft board app', () => {
     await act(async () => {
       setInputValue(search, 'James Whitby');
     });
-    const picked = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Picked');
+    const picked = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Mark Picked');
     if (!picked) throw new Error('missing picked');
     await act(async () => {
       picked.click();
@@ -295,7 +295,7 @@ describe('draft board app', () => {
     await act(async () => {
       setInputValue(search, 'James Whitby');
     });
-    const firstPick = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Picked');
+    const firstPick = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Mark Picked');
     if (!firstPick) throw new Error('missing first picked');
     await act(async () => {
       firstPick.click();
@@ -304,7 +304,7 @@ describe('draft board app', () => {
     await act(async () => {
       setInputValue(search, 'Bennett Reeve');
     });
-    const secondPick = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Picked');
+    const secondPick = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Mark Picked');
     if (!secondPick) throw new Error('missing second picked');
     await act(async () => {
       secondPick.click();

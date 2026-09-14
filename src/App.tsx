@@ -22,7 +22,9 @@ import { ourUpcomingPicks, teamForPick } from '@/lib/draftOrder';
 import { parsePlayerWorkbook } from '@/lib/importPlayers';
 import {
   filterPlayers,
+  classYearOptions,
   defaultSortDir,
+  type ClassFilter,
   type PoolView,
   type PositionFilter,
   type SortDir,
@@ -43,6 +45,7 @@ export default function App() {
   const [pool, setPool] = useState<PoolView>('available');
   const [rosterTeamId, setRosterTeamId] = useState<string | null>(null);
   const [position, setPosition] = useState<PositionFilter>('ALL');
+  const [classYear, setClassYear] = useState<ClassFilter>('ALL');
   const [sortKey, setSortKey] = useState<SortKey>('overall');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -82,6 +85,26 @@ export default function App() {
     };
   }, [setVersion]);
 
+  const listed = useMemo(
+    () =>
+      filterPlayers(session.players, {
+        query,
+        position,
+        classYear,
+        status: view === 'plan' ? 'all' : pool,
+        sortKey,
+        sortDir,
+      }),
+    [session.players, query, position, classYear, pool, sortKey, sortDir, view],
+  );
+  const classOptions = useMemo(() => classYearOptions(session.players), [session.players]);
+
+  useEffect(() => {
+    if (classYear !== 'ALL' && !classOptions.includes(classYear)) {
+      setClassYear('ALL');
+    }
+  }, [classOptions, classYear]);
+
   useEffect(() => {
     if (!session.teams.some((team) => team.id === captainTeamId && !team.isUs)) {
       const fallback = session.teams.find((team) => !team.isUs);
@@ -89,17 +112,6 @@ export default function App() {
     }
   }, [session.teams, captainTeamId]);
 
-  const listed = useMemo(
-    () =>
-      filterPlayers(session.players, {
-        query,
-        position,
-        status: view === 'plan' ? 'all' : pool,
-        sortKey,
-        sortDir,
-      }),
-    [session.players, query, position, pool, sortKey, sortDir, view],
-  );
   const selected = playerById(session, selectedId);
   const onClock = teamForPick(session.teams, session.currentPick, session.draftType).team;
   const nextOurs = ourUpcomingPicks(session, 1)[0];
@@ -355,13 +367,16 @@ export default function App() {
         <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
           <PlanningBoard
             players={listed}
+            classOptions={classOptions}
             selectedId={selectedId}
             query={query}
             position={position}
+            classYear={classYear}
             sortKey={sortKey}
             sortDir={sortDir}
             onQuery={setQuery}
             onPosition={setPosition}
+            onClassYear={setClassYear}
             onSort={changeSort}
             onSelect={setSelectedId}
             onEdit={(id, patch) => commit({ type: 'editPlayer', id, input: patch })}
@@ -373,16 +388,19 @@ export default function App() {
           <div className="min-w-0">
             <AvailableList
               players={listed}
+              classOptions={classOptions}
               teams={session.teams}
               pool={pool}
               selectedId={selectedId}
               query={query}
               position={position}
+              classYear={classYear}
               sortKey={sortKey}
               sortDir={sortDir}
               onPool={setPool}
               onQuery={setQuery}
               onPosition={setPosition}
+              onClassYear={setClassYear}
               onSort={changeSort}
               onSelect={setSelectedId}
               onRecordPick={recordClockPick}

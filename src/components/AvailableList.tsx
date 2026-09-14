@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, Search, Users } from 'lucide-react';
 import { RatingPips, TotalScore } from '@/components/RatingPips';
 import { formatOverall, overall } from '@/lib/ratings';
-import { type PoolView, type PositionFilter, type SortDir, type SortKey } from '@/lib/listPlayers';
+import { type ClassFilter, type PoolView, type PositionFilter, type SortDir, type SortKey } from '@/lib/listPlayers';
 import type { Player, Position, Team } from '@/types';
 
 const headerClass =
@@ -10,16 +10,19 @@ const cellClass = 'px-3 py-2.5 align-middle';
 
 type AvailableListProps = {
   players: Player[];
+  classOptions: string[];
   teams: Team[];
   pool: PoolView;
   selectedId: string | null;
   query: string;
   position: PositionFilter;
+  classYear: ClassFilter;
   sortKey: SortKey;
   sortDir: SortDir;
   onPool: (value: PoolView) => void;
   onQuery: (value: string) => void;
   onPosition: (value: PositionFilter) => void;
+  onClassYear: (value: ClassFilter) => void;
   onSort: (key: SortKey) => void;
   onSelect: (id: string) => void;
   onRecordPick: (id: string) => void;
@@ -29,16 +32,19 @@ type AvailableListProps = {
 
 export function AvailableList({
   players,
+  classOptions,
   teams,
   pool,
   selectedId,
   query,
   position,
+  classYear,
   sortKey,
   sortDir,
   onPool,
   onQuery,
   onPosition,
+  onClassYear,
   onSort,
   onSelect,
   onRecordPick,
@@ -66,22 +72,22 @@ export function AvailableList({
               ? `${players.length} taken`
               : ourTurn
                 ? 'Your pick — Take'
-                : `${onClockName} is on the clock — Picked`}
+                : `${onClockName} is on the clock — Mark Picked`}
           </p>
         </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_35px_rgba(8,31,43,.06)]">
         <div className="max-h-[min(70vh,720px)] overflow-auto">
-          <table className="w-full min-w-[800px] table-fixed border-separate border-spacing-0">
+          <table className="w-full min-w-[900px] table-fixed border-separate border-spacing-0">
             <colgroup>
               <col />
               <col className="w-[7.5rem]" />
-              <col className="w-[5.5rem]" />
+              <col className="w-[6.5rem]" />
               <col className="w-[8.5rem]" />
               <col className="w-[8.5rem]" />
               <col className="w-[6.25rem]" />
-              <col className="w-[6.5rem]" />
+              <col className="w-[9.5rem]" />
             </colgroup>
             <thead className="sticky top-0 z-10 bg-[#f3f6f6]">
               <tr>
@@ -120,12 +126,27 @@ export function AvailableList({
                   </div>
                 </th>
                 <th scope="col" className={headerClass}>
-                  <SortButton
-                    label="Class"
-                    active={sortKey === 'classYear'}
-                    dir={sortDir}
-                    onClick={() => onSort('classYear')}
-                  />
+                  <div className="flex flex-col gap-2">
+                    <SortButton
+                      label="Class"
+                      active={sortKey === 'classYear'}
+                      dir={sortDir}
+                      onClick={() => onSort('classYear')}
+                    />
+                    <select
+                      value={classYear}
+                      onChange={(event) => onClassYear(event.target.value)}
+                      className="h-8 rounded-md border border-slate-300 bg-white px-1 text-[11px] font-semibold normal-case tracking-normal text-ice"
+                      aria-label="Filter by class"
+                    >
+                      <option value="ALL">All</option>
+                      {classOptions.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </th>
                 <th scope="col" className={headerClass}>
                   <SortButton
@@ -152,7 +173,7 @@ export function AvailableList({
                   />
                 </th>
                 <th scope="col" className={`${headerClass} text-right`}>
-                  {showingTaken ? 'Team' : ourTurn ? 'Take' : 'Picked'}
+                  {showingTaken ? 'Team' : 'Action'}
                 </th>
               </tr>
             </thead>
@@ -196,12 +217,12 @@ export function AvailableList({
                       ) : (
                         <button
                           type="button"
-                          className={`h-8 rounded-lg px-2.5 text-xs font-bold text-white ${
+                          className={`inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg px-2.5 text-[10px] font-bold text-white ${
                             ourTurn ? 'bg-teal hover:bg-[#0b7565]' : 'bg-coral hover:bg-[#ca3f31]'
                           }`}
                           onClick={() => onRecordPick(player.id)}
                         >
-                          {ourTurn ? 'Take' : 'Picked'}
+                          {ourTurn ? 'Take' : 'Mark Picked'}
                         </button>
                       )}
                     </td>

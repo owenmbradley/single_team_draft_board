@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { comparePlayers, defaultSortDir, filterPlayers, teamCaptains, teamPicks } from '@/lib/listPlayers';
+import {
+  classYearOptions,
+  comparePlayers,
+  defaultSortDir,
+  filterPlayers,
+  teamCaptains,
+  teamPicks,
+} from '@/lib/listPlayers';
 import type { Player } from '@/types';
 
 function player(name: string, patch: Partial<Player> = {}): Player {
@@ -50,28 +57,41 @@ describe('player list sorting', () => {
 
 describe('player list filters', () => {
   const pool = [
-    player('Ada Cole', { position: 'Goalie', notes: 'Calm in net' }),
+    player('Ada Cole', { position: 'Goalie', notes: 'Calm in net', classYear: '2027' }),
     player('Bo Hale', { position: 'Skater', classYear: '2028' }),
   ];
 
-  it('keeps only matching position, search, and status', () => {
+  it('keeps only matching position, class, search, and status', () => {
     const goalies = filterPlayers(pool, {
       query: '',
       position: 'Goalie',
+      classYear: 'ALL',
       status: 'available',
       sortKey: 'name',
       sortDir: 'asc',
     });
     expect(goalies.map((item) => item.name)).toEqual(['Ada Cole']);
 
+    const classOf2028 = filterPlayers(pool, {
+      query: '',
+      position: 'ALL',
+      classYear: '2028',
+      status: 'available',
+      sortKey: 'name',
+      sortDir: 'asc',
+    });
+    expect(classOf2028.map((item) => item.name)).toEqual(['Bo Hale']);
+
     const search = filterPlayers(pool, {
       query: '2028',
       position: 'ALL',
+      classYear: 'ALL',
       status: 'available',
       sortKey: 'name',
       sortDir: 'asc',
     });
     expect(search.map((item) => item.name)).toEqual(['Bo Hale']);
+    expect(classYearOptions(pool)).toEqual(['2027', '2028']);
   });
 
   it('lists taken players and a team roster in pick order', () => {
@@ -85,6 +105,7 @@ describe('player list filters', () => {
       filterPlayers(taken, {
         query: '',
         position: 'ALL',
+        classYear: 'ALL',
         status: 'taken',
         sortKey: 'name',
         sortDir: 'asc',

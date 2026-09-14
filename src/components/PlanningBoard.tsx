@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, Search, Users } from 'lucide-react';
 import { RatingPips, TotalScore } from '@/components/RatingPips';
 import { formatOverall, overall } from '@/lib/ratings';
-import { type PositionFilter, type SortDir, type SortKey } from '@/lib/listPlayers';
+import { type ClassFilter, type PositionFilter, type SortDir, type SortKey } from '@/lib/listPlayers';
 import type { Player, PlayerInput, Position } from '@/types';
 
 const headerClass =
@@ -10,13 +10,16 @@ const cellClass = 'px-3 py-2.5 align-middle';
 
 type PlanningBoardProps = {
   players: Player[];
+  classOptions: string[];
   selectedId: string | null;
   query: string;
   position: PositionFilter;
+  classYear: ClassFilter;
   sortKey: SortKey;
   sortDir: SortDir;
   onQuery: (value: string) => void;
   onPosition: (value: PositionFilter) => void;
+  onClassYear: (value: ClassFilter) => void;
   onSort: (key: SortKey) => void;
   onSelect: (id: string) => void;
   onEdit: (id: string, patch: Partial<PlayerInput>) => void;
@@ -25,13 +28,16 @@ type PlanningBoardProps = {
 
 export function PlanningBoard({
   players,
+  classOptions,
   selectedId,
   query,
   position,
+  classYear,
   sortKey,
   sortDir,
   onQuery,
   onPosition,
+  onClassYear,
   onSort,
   onSelect,
   onEdit,
@@ -104,12 +110,27 @@ export function PlanningBoard({
                   </div>
                 </th>
                 <th scope="col" className={headerClass}>
-                  <SortButton
-                    label="Class"
-                    active={sortKey === 'classYear'}
-                    dir={sortDir}
-                    onClick={() => onSort('classYear')}
-                  />
+                  <div className="flex flex-col gap-2">
+                    <SortButton
+                      label="Class"
+                      active={sortKey === 'classYear'}
+                      dir={sortDir}
+                      onClick={() => onSort('classYear')}
+                    />
+                    <select
+                      value={classYear}
+                      onChange={(event) => onClassYear(event.target.value)}
+                      className="h-8 rounded-md border border-slate-300 bg-white px-1 text-[11px] font-semibold normal-case tracking-normal text-ice"
+                      aria-label="Filter by class"
+                    >
+                      <option value="ALL">All</option>
+                      {classOptions.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </th>
                 <th scope="col" className={headerClass}>
                   <SortButton
