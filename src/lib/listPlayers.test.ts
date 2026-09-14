@@ -4,6 +4,7 @@ import {
   comparePlayers,
   defaultSortDir,
   filterPlayers,
+  pruneClassFilter,
   teamCaptains,
   teamPicks,
 } from '@/lib/listPlayers';
@@ -59,13 +60,14 @@ describe('player list filters', () => {
   const pool = [
     player('Ada Cole', { position: 'Goalie', notes: 'Calm in net', classYear: '2027' }),
     player('Bo Hale', { position: 'Skater', classYear: '2028' }),
+    player('Cal Pike', { position: 'Skater', classYear: '2029' }),
   ];
 
   it('keeps only matching position, class, search, and status', () => {
     const goalies = filterPlayers(pool, {
       query: '',
       position: 'Goalie',
-      classYear: 'ALL',
+      classYear: [],
       status: 'available',
       sortKey: 'name',
       sortDir: 'asc',
@@ -75,23 +77,34 @@ describe('player list filters', () => {
     const classOf2028 = filterPlayers(pool, {
       query: '',
       position: 'ALL',
-      classYear: '2028',
+      classYear: ['2028'],
       status: 'available',
       sortKey: 'name',
       sortDir: 'asc',
     });
     expect(classOf2028.map((item) => item.name)).toEqual(['Bo Hale']);
 
+    const multiClass = filterPlayers(pool, {
+      query: '',
+      position: 'ALL',
+      classYear: ['2027', '2029'],
+      status: 'available',
+      sortKey: 'name',
+      sortDir: 'asc',
+    });
+    expect(multiClass.map((item) => item.name)).toEqual(['Ada Cole', 'Cal Pike']);
+
     const search = filterPlayers(pool, {
       query: '2028',
       position: 'ALL',
-      classYear: 'ALL',
+      classYear: [],
       status: 'available',
       sortKey: 'name',
       sortDir: 'asc',
     });
     expect(search.map((item) => item.name)).toEqual(['Bo Hale']);
-    expect(classYearOptions(pool)).toEqual(['2027', '2028']);
+    expect(classYearOptions(pool)).toEqual(['2027', '2028', '2029']);
+    expect(pruneClassFilter(['2027', '2030'], ['2027', '2028'])).toEqual(['2027']);
   });
 
   it('lists taken players and a team roster in pick order', () => {
@@ -105,7 +118,7 @@ describe('player list filters', () => {
       filterPlayers(taken, {
         query: '',
         position: 'ALL',
-        classYear: 'ALL',
+        classYear: [],
         status: 'taken',
         sortKey: 'name',
         sortDir: 'asc',

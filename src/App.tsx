@@ -45,7 +45,7 @@ export default function App() {
   const [pool, setPool] = useState<PoolView>('available');
   const [rosterTeamId, setRosterTeamId] = useState<string | null>(null);
   const [position, setPosition] = useState<PositionFilter>('ALL');
-  const [classYear, setClassYear] = useState<ClassFilter>('ALL');
+  const [classYear, setClassYear] = useState<ClassFilter>([]);
   const [sortKey, setSortKey] = useState<SortKey>('overall');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -100,10 +100,11 @@ export default function App() {
   const classOptions = useMemo(() => classYearOptions(session.players), [session.players]);
 
   useEffect(() => {
-    if (classYear !== 'ALL' && !classOptions.includes(classYear)) {
-      setClassYear('ALL');
-    }
-  }, [classOptions, classYear]);
+    setClassYear((current) => {
+      const next = current.filter((year) => classOptions.includes(year));
+      return next.length === current.length ? current : next;
+    });
+  }, [classOptions]);
 
   useEffect(() => {
     if (!session.teams.some((team) => team.id === captainTeamId && !team.isUs)) {

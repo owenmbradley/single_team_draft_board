@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp, Search, Users } from 'lucide-react';
+import { ClassYearFilter } from '@/components/ClassYearFilter';
 import { RatingPips, TotalScore } from '@/components/RatingPips';
 import { formatOverall, overall } from '@/lib/ratings';
 import { type ClassFilter, type PoolView, type PositionFilter, type SortDir, type SortKey } from '@/lib/listPlayers';
@@ -133,19 +134,7 @@ export function AvailableList({
                       dir={sortDir}
                       onClick={() => onSort('classYear')}
                     />
-                    <select
-                      value={classYear}
-                      onChange={(event) => onClassYear(event.target.value)}
-                      className="h-8 rounded-md border border-slate-300 bg-white px-1 text-[11px] font-semibold normal-case tracking-normal text-ice"
-                      aria-label="Filter by class"
-                    >
-                      <option value="ALL">All</option>
-                      {classOptions.map((year) => (
-                        <option key={year} value={year}>
-                          {year}
-                        </option>
-                      ))}
-                    </select>
+                    <ClassYearFilter options={classOptions} value={classYear} onChange={onClassYear} />
                   </div>
                 </th>
                 <th scope="col" className={headerClass}>
