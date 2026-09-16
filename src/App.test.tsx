@@ -265,8 +265,18 @@ describe('draft board app', () => {
     await act(async () => {
       asher.click();
     });
+    const captainSelect = Array.from(container.querySelectorAll('label'))
+      .find((label) => label.textContent?.includes('Captain for team'))
+      ?.querySelector('select');
+    if (!(captainSelect instanceof HTMLSelectElement)) throw new Error('missing captain team select');
+    const teamOne = Array.from(captainSelect.options).find((option) => option.textContent?.includes('Team 1'));
+    if (!teamOne) throw new Error('missing Team 1 option');
+    await act(async () => {
+      captainSelect.value = teamOne.value;
+      captainSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
     const cap = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Not available — captain'),
+      button.textContent?.includes('Mark as captain'),
     );
     if (!cap) throw new Error('missing captain action');
     await act(async () => {

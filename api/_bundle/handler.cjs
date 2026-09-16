@@ -5951,7 +5951,7 @@ function reduceSession(store, action) {
     case "markCaptain": {
       const player = session.players.find((item) => item.id === action.playerId);
       const team = session.teams.find((item) => item.id === action.teamId);
-      if (!player || player.status !== "available" || !team || team.isUs) return store;
+      if (!player || player.status !== "available" || !team) return store;
       return snapshot(store, {
         ...session,
         players: session.players.map(

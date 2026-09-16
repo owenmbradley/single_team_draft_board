@@ -45,16 +45,18 @@ export function RosterPanel({
     .filter(
       (player) =>
         player.status === 'my_team' ||
-        (player.status === 'assigned' && player.draftedByTeamId === ourTeam?.id),
+        (player.status === 'assigned' && player.draftedByTeamId === ourTeam?.id) ||
+        (player.status === 'captain' && player.captainOfTeamId === ourTeam?.id),
     )
     .sort((a, b) => {
+      if (a.status === 'captain' && b.status !== 'captain') return -1;
+      if (b.status === 'captain' && a.status !== 'captain') return 1;
       if (a.pickNumber != null && b.pickNumber != null) return a.pickNumber - b.pickNumber;
       if (a.pickNumber != null) return -1;
       if (b.pickNumber != null) return 1;
       return a.name.localeCompare(b.name);
     });
   const counts = rosterCounts(session.players, ourTeam?.id);
-  const otherTeams = session.teams.filter((team) => !team.isUs);
   const selectedTeamId = selected
     ? selected.draftedByTeamId ?? selected.captainOfTeamId
     : null;
@@ -142,21 +144,22 @@ export function RosterPanel({
                   disabled={false}
                 />
                 <label className="grid gap-1 text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Other team captain
+                  Captain for team
                   <select
                     className={inputClass}
                     value={captainTeamId}
                     onChange={(event) => onCaptainTeamId(event.target.value)}
                   >
-                    {otherTeams.map((team) => (
+                    {session.teams.map((team) => (
                       <option key={team.id} value={team.id}>
                         {team.name}
+                        {team.isUs ? ' (us)' : ''}
                       </option>
                     ))}
                   </select>
                 </label>
                 <button type="button" className={secondaryButtonClass} onClick={() => onMarkCaptain(selected.id)}>
-                  Not available — captain
+                  Mark as captain
                 </button>
               </div>
             )}
@@ -199,7 +202,13 @@ export function RosterPanel({
             >
               <RosterRow
                 player={player}
-                teamLabel={player.pickNumber != null ? `#${player.pickNumber}` : 'Assigned'}
+                teamLabel={
+                  player.status === 'captain'
+                    ? 'Captain'
+                    : player.pickNumber != null
+                      ? `#${player.pickNumber}`
+                      : 'Assigned'
+                }
               />
             </button>
           ))}

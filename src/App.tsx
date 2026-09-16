@@ -50,7 +50,7 @@ export default function App() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [captainTeamId, setCaptainTeamId] = useState(
-    session.teams.find((team) => !team.isUs)?.id ?? session.teams[0].id,
+    session.teams.find((team) => team.isUs)?.id ?? session.teams[0].id,
   );
   const [assignTeamId, setAssignTeamId] = useState(session.teams[0]?.id ?? '');
   const [dialog, setDialog] = useState<'import' | 'add' | 'setup' | 'correct' | null>(null);
@@ -108,8 +108,8 @@ export default function App() {
   }, [classOptions]);
 
   useEffect(() => {
-    if (!session.teams.some((team) => team.id === captainTeamId && !team.isUs)) {
-      const fallback = session.teams.find((team) => !team.isUs);
+    if (!session.teams.some((team) => team.id === captainTeamId)) {
+      const fallback = session.teams.find((team) => team.isUs) ?? session.teams[0];
       if (fallback) setCaptainTeamId(fallback.id);
     }
   }, [session.teams, captainTeamId]);
@@ -205,7 +205,7 @@ export default function App() {
 
   const markCaptain = (playerId: string) => {
     const team = session.teams.find((item) => item.id === captainTeamId);
-    if (!team || team.isUs) return;
+    if (!team) return;
     commit({ type: 'markCaptain', playerId, teamId: team.id });
     setSelectedId(null);
   };

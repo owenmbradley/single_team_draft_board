@@ -88,7 +88,8 @@ export function rosterCounts(players: Player[], ourTeamId?: string): { skaters: 
   const mine = players.filter(
     (player) =>
       player.status === 'my_team' ||
-      (player.status === 'assigned' && ourTeamId != null && player.draftedByTeamId === ourTeamId),
+      (player.status === 'assigned' && ourTeamId != null && player.draftedByTeamId === ourTeamId) ||
+      (player.status === 'captain' && ourTeamId != null && player.captainOfTeamId === ourTeamId),
   );
   return {
     skaters: mine.filter((player) => player.position === 'Skater').length,

@@ -67,6 +67,26 @@ describe('draft session', () => {
     expect(store.session.currentPick).toBe(1);
   });
 
+  it('marks our team captain without consuming a draft pick', () => {
+    let store = createStore();
+    store = reduceSession(store, { type: 'addPlayer', input: miles });
+    const ourTeam = store.session.teams.find((team) => team.isUs);
+    if (!ourTeam) throw new Error('expected our team');
+
+    store = reduceSession(store, {
+      type: 'markCaptain',
+      playerId: store.session.players[0].id,
+      teamId: ourTeam.id,
+    });
+
+    expect(store.session.players[0]).toMatchObject({
+      status: 'captain',
+      pickNumber: null,
+      captainOfTeamId: ourTeam.id,
+    });
+    expect(store.session.currentPick).toBe(1);
+  });
+
   it('moves an assigned player to another team without consuming a pick', () => {
     let store = createStore();
     store = reduceSession(store, { type: 'addPlayer', input: miles });
