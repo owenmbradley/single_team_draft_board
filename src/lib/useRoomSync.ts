@@ -20,32 +20,55 @@ export function useRoomSync(room: RoomConnection | null, dispatch: (action: Sess
   const versionRef = useRef(0);
   const timers = useRef(new Map<string, number>());
   const roomRef = useRef(room);
+  const sendChain = useRef(Promise.resolve());
   roomRef.current = room;
 
   const hydrate = (session: DraftSession, version: number) => {
+    if (version < versionRef.current) return;
     versionRef.current = version;
     dispatch({ type: 'hydrate', session: mergePending(session, pending.current) });
+  };
+
+  const heal = async () => {
+    const current = roomRef.current;
+    if (!current) return;
+    try {
+      const result = await readRoom(current.id, current.token);
+      hydrate(result.session, result.version);
+    } catch {
+      // Keep local state; next poll may recover.
+    }
   };
 
   const send = async (action: SessionAction) => {
     const current = roomRef.current;
     if (!current) return;
-    const result = await applyRoomAction(current.id, current.token, action);
-    if (action.type === 'editPlayer') {
-      const open = pending.current.get(action.id);
-      if (open) {
-        const next = { ...open };
-        for (const key of Object.keys(action.input) as (keyof PlayerInput)[]) {
-          if (next[key] === action.input[key]) delete next[key];
+    try {
+      const result = await applyRoomAction(current.id, current.token, action);
+      if (action.type === 'editPlayer') {
+        const open = pending.current.get(action.id);
+        if (open) {
+          const next = { ...open };
+          for (const key of Object.keys(action.input) as (keyof PlayerInput)[]) {
+            if (next[key] === action.input[key]) delete next[key];
+          }
+          if (Object.keys(next).length === 0) pending.current.delete(action.id);
+          else pending.current.set(action.id, next);
         }
-        if (Object.keys(next).length === 0) pending.current.delete(action.id);
-        else pending.current.set(action.id, next);
       }
+      hydrate(result.session, result.version);
+    } catch {
+      await heal();
     }
-    hydrate(result.session, result.version);
+  };
+
+  const enqueueSend = (action: SessionAction) => {
+    sendChain.current = sendChain.current.then(() => send(action)).catch(() => undefined);
   };
 
   const commit = (action: SessionAction) => {
+    if (roomRef.current && action.type === 'undo') return;
+
     dispatch(action);
     if (!roomRef.current) return;
 
@@ -57,14 +80,14 @@ export function useRoomSync(room: RoomConnection | null, dispatch: (action: Sess
         if (previous) window.clearTimeout(previous);
         const handle = window.setTimeout(() => {
           timers.current.delete(action.id);
-          void send(action).catch(() => undefined);
+          enqueueSend(action);
         }, 400);
         timers.current.set(action.id, handle);
         return;
       }
     }
 
-    void send(action).catch(() => undefined);
+    enqueueSend(action);
   };
 
   useEffect(() => {

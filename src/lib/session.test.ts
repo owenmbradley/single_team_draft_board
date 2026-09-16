@@ -37,14 +37,15 @@ describe('draft session', () => {
       draftedByTeamId: onClock.id,
     });
 
-    const ourTeam = store.session.teams.find((team) => team.isUs);
+    const nextTeam = store.session.teams.find((team) => team.slot === 2);
     const patPlayer = store.session.players.find((player) => player.name === 'Pat Lee');
-    if (!ourTeam || !patPlayer) throw new Error('expected our team and Pat');
+    if (!nextTeam || !patPlayer) throw new Error('expected next team and Pat');
 
-    store = reduceSession(store, { type: 'recordPick', playerId: patPlayer.id, teamId: ourTeam.id });
+    store = reduceSession(store, { type: 'recordPick', playerId: patPlayer.id, teamId: nextTeam.id });
     expect(store.session.players.find((player) => player.name === 'Pat Lee')).toMatchObject({
-      status: 'my_team',
+      status: 'drafted',
       pickNumber: 2,
+      draftedByTeamId: nextTeam.id,
     });
     expect(store.session.currentPick).toBe(3);
   });
@@ -86,6 +87,52 @@ describe('draft session', () => {
       draftedByTeamId: second.id,
     });
     expect(store.session.currentPick).toBe(1);
+  });
+
+  it('keeps the pick number when moving a drafted player to another team', () => {
+    let store = createStore();
+    store = reduceSession(store, { type: 'addPlayer', input: miles });
+    store = reduceSession(store, { type: 'addPlayer', input: pat });
+    const [first, second] = store.session.teams;
+    store = reduceSession(store, {
+      type: 'recordPick',
+      playerId: store.session.players[0].id,
+      teamId: first.id,
+    });
+    store = reduceSession(store, {
+      type: 'assignOutsideDraft',
+      playerId: store.session.players[0].id,
+      teamId: second.id,
+    });
+    expect(store.session.players[0]).toMatchObject({
+      status: 'drafted',
+      pickNumber: 1,
+      draftedByTeamId: second.id,
+    });
+    expect(store.session.currentPick).toBe(2);
+  });
+
+  it('does not record picks past the end of the board', () => {
+    let store = createStore();
+    store = reduceSession(store, {
+      type: 'configure',
+      teamCount: 2,
+      ourSlot: 1,
+      draftType: 'snake',
+      teamNames: ['Us', 'Them'],
+    });
+    store = reduceSession(store, { type: 'addPlayer', input: miles });
+    store = reduceSession(store, { type: 'addPlayer', input: pat });
+    store = reduceSession(store, { type: 'skipPick' });
+    store = reduceSession(store, { type: 'skipPick' });
+    expect(store.session.currentPick).toBe(3);
+    store = reduceSession(store, {
+      type: 'recordPick',
+      playerId: store.session.players[0].id,
+      teamId: store.session.teams[0].id,
+    });
+    expect(store.session.players[0].status).toBe('available');
+    expect(store.session.currentPick).toBe(3);
   });
 
   it('assigns a player to any team without consuming a draft pick', () => {

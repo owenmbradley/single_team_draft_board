@@ -29,6 +29,7 @@ type AvailableListProps = {
   onRecordPick: (id: string) => void;
   onSkipPick: () => void;
   canSkip: boolean;
+  canRecordPick: boolean;
   ourTurn: boolean;
   onClockName: string;
 };
@@ -53,6 +54,7 @@ export function AvailableList({
   onRecordPick,
   onSkipPick,
   canSkip,
+  canRecordPick,
   ourTurn,
   onClockName,
 }: AvailableListProps) {
@@ -221,10 +223,11 @@ export function AvailableList({
                       ) : (
                         <button
                           type="button"
-                          className={`inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg px-2.5 text-[10px] font-bold text-white ${
+                          className={`inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg px-2.5 text-[10px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-40 ${
                             ourTurn ? 'bg-teal hover:bg-[#0b7565]' : 'bg-coral hover:bg-[#ca3f31]'
                           }`}
                           onClick={() => onRecordPick(player.id)}
+                          disabled={!canRecordPick}
                         >
                           {ourTurn ? 'Take' : 'Mark Picked'}
                         </button>
@@ -280,16 +283,20 @@ function PoolButton({
 }
 
 function TakenMeta({ player, teams }: { player: Player; teams: Team[] }) {
-  const team = teams.find((item) => item.id === player.draftedByTeamId);
+  const team = teams.find(
+    (item) => item.id === player.draftedByTeamId || item.id === player.captainOfTeamId,
+  );
   return (
     <div className="leading-tight">
       <p className="text-xs font-bold text-ice">{team?.name ?? 'Taken'}</p>
       <p className="text-[11px] font-semibold text-slate-500">
         {player.pickNumber != null
           ? `#${player.pickNumber}`
-          : player.status === 'assigned'
-            ? 'Assigned'
-            : 'No pick'}
+          : player.status === 'captain'
+            ? 'Captain'
+            : player.status === 'assigned'
+              ? 'Assigned'
+              : 'No pick'}
       </p>
     </div>
   );

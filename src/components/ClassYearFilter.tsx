@@ -26,11 +26,14 @@ export function ClassYearFilter({ options, value, onChange }: ClassYearFilterPro
     value.length === 0 ? 'All' : value.length === 1 ? value[0] : `${value.length} selected`;
 
   const toggleYear = (year: string) => {
-    if (value.includes(year)) {
-      onChange(value.filter((item) => item !== year));
+    const next = value.includes(year)
+      ? value.filter((item) => item !== year)
+      : [...value, year].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    if (options.length > 0 && options.every((item) => next.includes(item))) {
+      onChange([]);
       return;
     }
-    onChange([...value, year].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })));
+    onChange(next);
   };
 
   return (

@@ -133,28 +133,49 @@ export default function App() {
   const exportReady = canExportDraft(session);
   const draftDone = isDraftComplete(session);
 
+  const resetBoardUi = () => {
+    setQuery('');
+    setPool('available');
+    setRosterTeamId(null);
+    setPosition('ALL');
+    setClassYear([]);
+    setSortKey('overall');
+    setSortDir('desc');
+    setSelectedId(null);
+    setDialog(null);
+    setView('draft');
+    setCorrectionMode(false);
+    setCorrectPickNumber(null);
+  };
+
   const enterRoom = (payload: RoomPayload) => {
     const connection = { id: payload.id, name: payload.name, token: payload.token };
     saveRoomConnection(connection);
     setRoom(connection);
     setVersion(payload.version);
     dispatch({ type: 'hydrate', session: payload.session });
+    resetBoardUi();
     setGate('board');
   };
 
   const enterSandbox = () => {
     clearSavedSession();
     dispatch({ type: 'hydrate', session: createSeededSession() });
+    resetBoardUi();
     setGate('board');
   };
 
   const leaveRoom = () => {
     clearRoomConnection();
     setRoom(null);
+    resetBoardUi();
     setGate('lobby');
   };
 
+  const canRecordPick = session.currentPick <= maxPicks(session);
+
   const recordClockPick = (playerId: string) => {
+    if (!canRecordPick) return;
     commit({ type: 'recordPick', playerId, teamId: onClock.id });
     setSelectedId(null);
   };
@@ -252,7 +273,8 @@ export default function App() {
             <button
               type="button"
               className={headerActionClass}
-              disabled={past.length === 0}
+              disabled={Boolean(room) || past.length === 0}
+              title={room ? 'Undo is only available in sandbox mode' : undefined}
               onClick={() => commit({ type: 'undo' })}
             >
               <Undo2 className="size-3.5" />
@@ -341,7 +363,18 @@ export default function App() {
                 correctionMode={correctionMode}
                 onOpenTeam={setRosterTeamId}
                 onCorrectPick={openCorrectMenu}
-                onMoveTeam={(teamId, direction) => commit({ type: 'reorderTeam', teamId, direction })}
+                onMoveTeam={(teamId, direction) => {
+                  const hasOccupied =
+                    session.players.some((player) => player.pickNumber != null) ||
+                    (session.skippedPicks?.length ?? 0) > 0;
+                  if (
+                    hasOccupied &&
+                    !window.confirm('Reorder teams and clear all picks and skips? Captains and ratings stay.')
+                  ) {
+                    return;
+                  }
+                  commit({ type: 'reorderTeam', teamId, direction });
+                }}
               />
             </div>
           )}
@@ -431,7 +464,8 @@ export default function App() {
               onSelect={selectPlayer}
               onRecordPick={recordClockPick}
               onSkipPick={() => commit({ type: 'skipPick' })}
-              canSkip={session.currentPick <= maxPicks(session)}
+              canSkip={canRecordPick}
+              canRecordPick={canRecordPick}
               ourTurn={onClock.isUs}
               onClockName={onClock.name}
             />
@@ -447,6 +481,7 @@ export default function App() {
               onCaptainTeamId={setCaptainTeamId}
               onAssignTeamId={setAssignTeamId}
               onRecordPick={recordClockPick}
+              canRecordPick={canRecordPick}
               onMarkCaptain={markCaptain}
               onAssignOutsideDraft={assignOutsideDraft}
               onRestore={(id) => {
@@ -502,6 +537,7 @@ export default function App() {
               ourSlot: next.ourSlot,
               draftType: next.draftType,
               teamNames: next.teamNames,
+              teamIds: next.teamIds,
             });
           }}
           onResetPicks={() => {

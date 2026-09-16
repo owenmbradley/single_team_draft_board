@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { maxPicks, teamForPick, type MoveDirection } from '@/lib/draftOrder';
+import { lastOccupiedPick } from '@/lib/correctPick';
 import { teamAssigned, teamCaptains, teamPicks } from '@/lib/listPlayers';
 import type { DraftSession } from '@/types';
 
@@ -47,7 +48,8 @@ export function PickBoard({
   }, []);
 
   const total = maxPicks(session);
-  const { start, end } = visiblePickWindow(session.currentPick, total, visibleCount);
+  const lastOccupied = lastOccupiedPick(session);
+  const { start, end } = visiblePickWindow(session.currentPick, total, visibleCount, lastOccupied);
   const rows = [];
 
   for (let pick = start; pick <= end; pick += 1) {
@@ -193,17 +195,23 @@ export function PickBoard({
   );
 }
 
-/** Fill the strip with past picks ending at the current pick (pad forward only at the start). */
+/** Prefer current pick and later occupied slots so mid-board gaps do not hide filled picks. */
 export function visiblePickWindow(
   currentPick: number,
   total: number,
   visibleCount: number,
+  lastOccupied = currentPick,
 ): { start: number; end: number } {
   const count = Math.max(MIN_VISIBLE_PICKS, Math.min(visibleCount, total));
-  let end = Math.min(total, currentPick);
+  let end = Math.min(total, Math.max(currentPick, lastOccupied));
   let start = Math.max(1, end - count + 1);
+  if (currentPick < start) {
+    start = Math.max(1, currentPick);
+    end = Math.min(total, start + count - 1);
+  }
   if (end - start + 1 < count) {
     end = Math.min(total, start + count - 1);
+    start = Math.max(1, end - count + 1);
   }
   return { start, end };
 }

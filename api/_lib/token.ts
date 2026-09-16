@@ -3,7 +3,12 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 const DAY_MS = 1000 * 60 * 60 * 24 * 14;
 
 function secret(): string {
-  return process.env.ROOM_TOKEN_SECRET?.trim() || 'dev-only-room-token';
+  const value = process.env.ROOM_TOKEN_SECRET?.trim();
+  if (value) return value;
+  if (process.env.VERCEL) {
+    throw new Error('ROOM_TOKEN_SECRET must be set in production.');
+  }
+  return 'dev-only-room-token';
 }
 
 function sign(value: string): string {

@@ -13,33 +13,53 @@ type SetupDialogProps = {
     ourSlot: number;
     draftType: DraftType;
     teamNames: string[];
+    teamIds: string[];
   }) => void;
   onResetPicks: () => void;
   onClearPlayers: () => void;
 };
 
 export function SetupDialog({ session, onClose, onSave, onResetPicks, onClearPlayers }: SetupDialogProps) {
+  const initial = [...session.teams].sort((a, b) => a.slot - b.slot);
   const [name, setName] = useState(session.name);
   const [teamCount, setTeamCount] = useState(session.teams.length);
   const [ourSlot, setOurSlot] = useState(session.teams.find((team) => team.isUs)?.slot ?? 1);
   const [draftType, setDraftType] = useState<DraftType>(session.draftType);
-  const [teamNames, setTeamNames] = useState(session.teams.map((team) => team.name));
+  const [teamIds, setTeamIds] = useState(initial.map((team) => team.id));
+  const [teamNames, setTeamNames] = useState(initial.map((team) => team.name));
   const rounds = draftRounds(session.players.length, teamCount);
 
-  const names = useMemo(() => {
+  const rows = useMemo(() => {
     return Array.from({ length: teamCount }, (_, index) => {
-      if (teamNames[index]) return teamNames[index];
       const slot = index + 1;
-      return slot === ourSlot ? 'Our Team' : `Team ${slot}`;
+      const id = teamIds[index] ?? `team-${slot}`;
+      const fallback = slot === ourSlot ? 'Our Team' : `Team ${slot}`;
+      return {
+        id,
+        name: teamNames[index] || fallback,
+      };
     });
-  }, [teamCount, teamNames, ourSlot]);
+  }, [teamCount, teamIds, teamNames, ourSlot]);
+
+  const resizeTeams = (nextCount: number) => {
+    const count = Math.min(20, Math.max(2, nextCount));
+    setTeamCount(count);
+    setTeamIds((current) =>
+      Array.from({ length: count }, (_, index) => current[index] ?? `team-${index + 1}`),
+    );
+    setTeamNames((current) => Array.from({ length: count }, (_, index) => current[index] ?? ''));
+    if (ourSlot > count) setOurSlot(count);
+  };
 
   const moveSetupTeam = (index: number, offset: -1 | 1) => {
     const target = index + offset;
-    if (target < 0 || target >= names.length) return;
-    const next = [...names];
-    [next[index], next[target]] = [next[target], next[index]];
-    setTeamNames(next);
+    if (target < 0 || target >= rows.length) return;
+    const nextIds = rows.map((row) => row.id);
+    const nextNames = rows.map((row) => row.name);
+    [nextIds[index], nextIds[target]] = [nextIds[target], nextIds[index]];
+    [nextNames[index], nextNames[target]] = [nextNames[target], nextNames[index]];
+    setTeamIds(nextIds);
+    setTeamNames(nextNames);
     if (ourSlot === index + 1) setOurSlot(target + 1);
     else if (ourSlot === target + 1) setOurSlot(index + 1);
   };
@@ -78,11 +98,7 @@ export function SetupDialog({ session, onClose, onSave, onResetPicks, onClearPla
               min={2}
               max={20}
               value={teamCount}
-              onChange={(event) => {
-                const next = Number(event.target.value);
-                setTeamCount(next);
-                if (ourSlot > next) setOurSlot(next);
-              }}
+              onChange={(event) => resizeTeams(Number(event.target.value))}
             />
           </Field>
           <Field label="Our slot">
@@ -106,19 +122,19 @@ export function SetupDialog({ session, onClose, onSave, onResetPicks, onClearPla
         <p className="text-xs font-medium text-slate-500">
           Rounds update from the player pool and team count. Changing teams or our slot clears picks
           and captains. Switching snake/linear clears picks so the board matches the new order;
-          captains stay.
+          captains stay. Reordering keeps each team’s roster attached.
         </p>
         <div>
           <p className="eyebrow mb-2 text-slate-500">Draft order</p>
           <div className="grid max-h-56 gap-2 overflow-y-auto pr-1">
-            {names.map((teamName, index) => (
-              <div key={index} className="flex items-center gap-2">
+            {rows.map((row, index) => (
+              <div key={row.id} className="flex items-center gap-2">
                 <span className="w-8 font-mono text-xs text-slate-400">{index + 1}</span>
                 <input
                   className={inputClass}
-                  value={teamName}
+                  value={row.name}
                   onChange={(event) => {
-                    const next = [...names];
+                    const next = rows.map((item) => item.name);
                     next[index] = event.target.value;
                     setTeamNames(next);
                   }}
@@ -127,7 +143,7 @@ export function SetupDialog({ session, onClose, onSave, onResetPicks, onClearPla
                   <button
                     type="button"
                     className="grid size-5 place-items-center text-slate-400 hover:text-ice disabled:opacity-25"
-                    aria-label={`Move ${teamName} up`}
+                    aria-label={`Move ${row.name} up`}
                     disabled={index === 0}
                     onClick={() => moveSetupTeam(index, -1)}
                   >
@@ -136,8 +152,8 @@ export function SetupDialog({ session, onClose, onSave, onResetPicks, onClearPla
                   <button
                     type="button"
                     className="grid size-5 place-items-center text-slate-400 hover:text-ice disabled:opacity-25"
-                    aria-label={`Move ${teamName} down`}
-                    disabled={index === names.length - 1}
+                    aria-label={`Move ${row.name} down`}
+                    disabled={index === rows.length - 1}
                     onClick={() => moveSetupTeam(index, 1)}
                   >
                     <ChevronDown className="size-4" />
@@ -164,7 +180,14 @@ export function SetupDialog({ session, onClose, onSave, onResetPicks, onClearPla
             type="button"
             className={primaryButtonClass}
             onClick={() => {
-              onSave({ name, teamCount, ourSlot, draftType, teamNames: names });
+              onSave({
+                name,
+                teamCount,
+                ourSlot,
+                draftType,
+                teamNames: rows.map((row) => row.name),
+                teamIds: rows.map((row) => row.id),
+              });
               onClose();
             }}
           >

@@ -8,6 +8,7 @@ import {
   nextOpenPick,
   normalizeDraftType,
   ourTeam,
+  teamForPick,
   type MoveDirection,
 } from './draftOrder';
 import { createId } from './ids';
@@ -23,6 +24,7 @@ export type SessionAction =
       ourSlot: number;
       draftType: DraftSession['draftType'];
       teamNames: string[];
+      teamIds?: string[];
     }
   | { type: 'renameTeam'; teamId: string; name: string }
   | { type: 'reorderTeam'; teamId: string; direction: MoveDirection }
@@ -156,37 +158,50 @@ export function reduceSession(store: SessionStore, action: SessionAction): Sessi
       return { session: previous, past: store.past.slice(0, -1) };
     }
     case 'configure': {
-      const teams = buildTeams(action.teamCount, action.ourSlot, action.teamNames);
       const draftType = normalizeDraftType(action.draftType);
-      const teamCountChanged = teams.length !== session.teams.length;
-      const slotChanged = teams.find((team) => team.isUs)?.slot !== ourTeam(session)?.slot;
+      const teamCount = Math.min(20, Math.max(2, Math.round(action.teamCount)));
+      const ourSlot = Math.min(teamCount, Math.max(1, Math.round(action.ourSlot)));
+      const countChanged = teamCount !== session.teams.length;
+      const previousOurSlot = ourTeam(session)?.slot;
+      const slotChanged = previousOurSlot !== ourSlot;
       const orderChanged = draftType !== session.draftType;
+
+      let teams = session.teams;
+      if (countChanged) {
+        teams = buildTeams(teamCount, ourSlot, action.teamNames);
+      } else {
+        const sorted = [...session.teams].sort((a, b) => a.slot - b.slot);
+        const orderedIds =
+          action.teamIds && action.teamIds.length === sorted.length
+            ? action.teamIds
+            : sorted.map((team) => team.id);
+        const byId = new Map(session.teams.map((team) => [team.id, team]));
+        teams = orderedIds.map((id, index) => {
+          const existing = byId.get(id) ?? sorted[index];
+          const slot = index + 1;
+          const provided = action.teamNames[index]?.trim();
+          return {
+            id: existing.id,
+            slot,
+            isUs: slot === ourSlot,
+            name: provided || existing.name || (slot === ourSlot ? 'Our Team' : `Team ${slot}`),
+          };
+        });
+      }
+
       let players = session.players;
-      if (teamCountChanged || slotChanged) {
+      let skippedPicks = normalizeSkippedPicks(session.skippedPicks);
+      if (countChanged || slotChanged) {
         players = session.players.map((player) => ({
           ...resetAssignment(player),
           status: 'available' as const,
           captainOfTeamId: null,
           draftedByTeamId: null,
         }));
-        return snapshot(store, {
-          ...session,
-          name: action.name?.trim() ? action.name.slice(0, 80) : session.name,
-          draftType,
-          teams,
-          players,
-          skippedPicks: [],
-        });
+        skippedPicks = [];
       } else if (orderChanged) {
         players = session.players.map(resetAssignment);
-        return snapshot(store, {
-          ...session,
-          name: action.name?.trim() ? action.name.slice(0, 80) : session.name,
-          draftType,
-          teams,
-          players,
-          skippedPicks: [],
-        });
+        skippedPicks = [];
       }
       return snapshot(store, {
         ...session,
@@ -194,6 +209,7 @@ export function reduceSession(store: SessionStore, action: SessionAction): Sessi
         draftType,
         teams,
         players,
+        skippedPicks,
       });
     }
     case 'reorderTeam': {
@@ -258,19 +274,28 @@ export function reduceSession(store: SessionStore, action: SessionAction): Sessi
         players: [...session.players, toPlayer(action.input)],
       });
     }
-    case 'editPlayer':
+    case 'editPlayer': {
+      const existing = session.players.find((player) => player.id === action.id);
+      if (!existing) return store;
+      const nextName = action.input.name !== undefined ? action.input.name.trim() : existing.name;
+      if (!nextName) return store;
       return snapshot(store, {
         ...session,
         players: session.players.map((player) =>
-          player.id === action.id ? toPlayer({ ...player, ...action.input, name: action.input.name ?? player.name }, player) : player,
+          player.id === action.id
+            ? toPlayer({ ...player, ...action.input, name: nextName }, player)
+            : player,
         ),
       });
-    case 'recordPick': {
+    }    case 'recordPick': {
       const player = session.players.find((item) => item.id === action.playerId);
       const team = session.teams.find((item) => item.id === action.teamId);
       if (!player || player.status !== 'available' || !team) return store;
       const skippedPicks = normalizeSkippedPicks(session.skippedPicks);
       const pickNumber = nextOpenPick(session.players, maxPicks(session), skippedPicks);
+      if (pickNumber > maxPicks(session)) return store;
+      const onClock = teamForPick(session.teams, pickNumber, session.draftType).team;
+      if (onClock.id !== team.id) return store;
       return snapshot(store, {
         ...session,
         skippedPicks: withoutSkippedPick(skippedPicks, pickNumber),
@@ -361,14 +386,15 @@ export function reduceSession(store: SessionStore, action: SessionAction): Sessi
       ) {
         return store;
       }
+      const keepPick = player.pickNumber != null;
       return snapshot(store, {
         ...session,
         players: session.players.map((item) =>
           item.id === player.id
             ? {
                 ...item,
-                status: 'assigned',
-                pickNumber: null,
+                status: keepPick ? (team.isUs ? 'my_team' : 'drafted') : 'assigned',
+                pickNumber: keepPick ? player.pickNumber : null,
                 draftedByTeamId: team.id,
                 captainOfTeamId: null,
               }

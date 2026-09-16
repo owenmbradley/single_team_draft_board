@@ -125,7 +125,7 @@ describe('player list filters', () => {
         sortKey: 'name',
         sortDir: 'asc',
       }).map((item) => item.name),
-    ).toEqual(['Ada Cole', 'Bo Hale', 'Dee Moss']);
+    ).toEqual(['Ada Cole', 'Bo Hale', 'Cal Pike', 'Dee Moss']);
 
     expect(teamPicks(taken, 'team-1').map((item) => item.name)).toEqual(['Bo Hale']);
     expect(teamCaptains(taken, 'team-1').map((item) => item.name)).toEqual(['Cal Pike']);

@@ -45,7 +45,7 @@ export function AddPlayerDialog({ onClose, onAdd }: AddPlayerDialogProps) {
             autoFocus
             className={inputClass}
             value={form.name}
-            onChange={(event) => setForm({ ...form, name: event.target.value })}
+            onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
             placeholder="Last-minute add"
           />
         </Field>
@@ -54,7 +54,7 @@ export function AddPlayerDialog({ onClose, onAdd }: AddPlayerDialogProps) {
             <select
               className={inputClass}
               value={form.position}
-              onChange={(event) => setForm({ ...form, position: event.target.value as Position })}
+              onChange={(event) => setForm((current) => ({ ...current, position: event.target.value as Position }))}
             >
               <option value="Skater">Skater</option>
               <option value="Goalie">Goalie</option>
@@ -64,22 +64,22 @@ export function AddPlayerDialog({ onClose, onAdd }: AddPlayerDialogProps) {
             <input
               className={inputClass}
               value={form.classYear}
-              onChange={(event) => setForm({ ...form, classYear: event.target.value })}
+              onChange={(event) => setForm((current) => ({ ...current, classYear: event.target.value }))}
               placeholder="Optional"
             />
           </Field>
         </div>
         <Field label="Talent">
-          <RatingPips label="Talent" value={form.talent} onChange={(talent) => setForm({ ...form, talent })} />
+          <RatingPips label="Talent" value={form.talent} onChange={(talent) => setForm((current) => ({ ...current, talent }))} />
         </Field>
         <Field label="Vibes">
-          <RatingPips label="Vibes" value={form.vibes} onChange={(vibes) => setForm({ ...form, vibes })} />
+          <RatingPips label="Vibes" value={form.vibes} onChange={(vibes) => setForm((current) => ({ ...current, vibes }))} />
         </Field>
         <Field label="Notes">
           <input
             className={inputClass}
             value={form.notes}
-            onChange={(event) => setForm({ ...form, notes: event.target.value })}
+            onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
             placeholder="Shot, room presence, anything useful"
           />
         </Field>

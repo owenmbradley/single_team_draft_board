@@ -99,7 +99,12 @@ export function rosterCounts(players: Player[], ourTeamId?: string): { skaters: 
 export function matchesStatus(player: Player, status: StatusFilter): boolean {
   if (status === 'all') return true;
   if (status === 'taken') {
-    return player.status === 'drafted' || player.status === 'my_team' || player.status === 'assigned';
+    return (
+      player.status === 'drafted' ||
+      player.status === 'my_team' ||
+      player.status === 'assigned' ||
+      player.status === 'captain'
+    );
   }
   return player.status === status;
 }

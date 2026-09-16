@@ -111,16 +111,27 @@ export function createRoomService(store: RoomStore) {
       if (!action || typeof action !== 'object' || !ALLOWED_ACTIONS.has(action.type)) {
         throw new RoomError('That action cannot be synced.', 400);
       }
+      if (action.type === 'undo') {
+        throw new RoomError('Undo is only available in sandbox mode.', 400);
+      }
       const room = await requireAuthorized(id, token);
+      const expectedVersion = room.version;
       const next = reduceSession(room.store, action);
       const changed = next !== room.store;
+      if (!changed) return payload(room, token);
+
+      const latest = await store.get(id);
+      if (!latest || latest.version !== expectedVersion) {
+        throw new RoomError('Room was updated by someone else. Try again.', 409);
+      }
+
       const saved: RoomRecord = {
-        ...room,
-        version: changed ? room.version + 1 : room.version,
-        updatedAt: changed ? new Date().toISOString() : room.updatedAt,
+        ...latest,
+        version: latest.version + 1,
+        updatedAt: new Date().toISOString(),
         store: next,
       };
-      if (changed) await store.save(saved);
+      await store.save(saved);
       return payload(saved, token);
     },
   };

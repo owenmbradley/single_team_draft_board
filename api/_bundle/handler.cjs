@@ -5355,6 +5355,7 @@ var init_fileStore = __esm({
     FileRoomStore = class {
       kind = "file";
       filePath;
+      queue = Promise.resolve();
       constructor(filePath) {
         this.filePath = filePath;
       }
@@ -5371,17 +5372,31 @@ var init_fileStore = __esm({
         await (0, import_promises.mkdir)((0, import_node_path.dirname)(this.filePath), { recursive: true });
         await (0, import_promises.writeFile)(this.filePath, JSON.stringify(rooms), "utf8");
       }
+      enqueue(work) {
+        const run = this.queue.then(work, work);
+        this.queue = run.then(
+          () => void 0,
+          () => void 0
+        );
+        return run;
+      }
       async list() {
-        return Object.values(await this.readAll()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        return this.enqueue(
+          async () => Object.values(await this.readAll()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        );
       }
       async get(id) {
-        const rooms = await this.readAll();
-        return rooms[id] ?? null;
+        return this.enqueue(async () => {
+          const rooms = await this.readAll();
+          return rooms[id] ?? null;
+        });
       }
       async save(room) {
-        const rooms = await this.readAll();
-        rooms[room.id] = room;
-        await this.writeAll(rooms);
+        await this.enqueue(async () => {
+          const rooms = await this.readAll();
+          rooms[room.id] = room;
+          await this.writeAll(rooms);
+        });
       }
     };
   }
@@ -5484,7 +5499,12 @@ async function getRoomStore() {
 var import_node_crypto4 = require("node:crypto");
 var DAY_MS = 1e3 * 60 * 60 * 24 * 14;
 function secret() {
-  return process.env.ROOM_TOKEN_SECRET?.trim() || "dev-only-room-token";
+  const value = process.env.ROOM_TOKEN_SECRET?.trim();
+  if (value) return value;
+  if (process.env.VERCEL) {
+    throw new Error("ROOM_TOKEN_SECRET must be set in production.");
+  }
+  return "dev-only-room-token";
 }
 function sign(value) {
   return (0, import_node_crypto4.createHmac)("sha256", secret()).update(value).digest("base64url");
@@ -5750,44 +5770,53 @@ function reduceSession(store, action) {
       return { session: previous, past: store.past.slice(0, -1) };
     }
     case "configure": {
-      const teams = buildTeams(action.teamCount, action.ourSlot, action.teamNames);
       const draftType = normalizeDraftType(action.draftType);
-      const teamCountChanged = teams.length !== session.teams.length;
-      const slotChanged = teams.find((team) => team.isUs)?.slot !== ourTeam(session)?.slot;
+      const teamCount = Math.min(20, Math.max(2, Math.round(action.teamCount)));
+      const ourSlot = Math.min(teamCount, Math.max(1, Math.round(action.ourSlot)));
+      const countChanged = teamCount !== session.teams.length;
+      const previousOurSlot = ourTeam(session)?.slot;
+      const slotChanged = previousOurSlot !== ourSlot;
       const orderChanged = draftType !== session.draftType;
+      let teams = session.teams;
+      if (countChanged) {
+        teams = buildTeams(teamCount, ourSlot, action.teamNames);
+      } else {
+        const sorted = [...session.teams].sort((a, b) => a.slot - b.slot);
+        const orderedIds = action.teamIds && action.teamIds.length === sorted.length ? action.teamIds : sorted.map((team) => team.id);
+        const byId = new Map(session.teams.map((team) => [team.id, team]));
+        teams = orderedIds.map((id, index) => {
+          const existing = byId.get(id) ?? sorted[index];
+          const slot = index + 1;
+          const provided = action.teamNames[index]?.trim();
+          return {
+            id: existing.id,
+            slot,
+            isUs: slot === ourSlot,
+            name: provided || existing.name || (slot === ourSlot ? "Our Team" : `Team ${slot}`)
+          };
+        });
+      }
       let players = session.players;
-      if (teamCountChanged || slotChanged) {
+      let skippedPicks = normalizeSkippedPicks(session.skippedPicks);
+      if (countChanged || slotChanged) {
         players = session.players.map((player) => ({
           ...resetAssignment(player),
           status: "available",
           captainOfTeamId: null,
           draftedByTeamId: null
         }));
-        return snapshot(store, {
-          ...session,
-          name: action.name?.trim() ? action.name.slice(0, 80) : session.name,
-          draftType,
-          teams,
-          players,
-          skippedPicks: []
-        });
+        skippedPicks = [];
       } else if (orderChanged) {
         players = session.players.map(resetAssignment);
-        return snapshot(store, {
-          ...session,
-          name: action.name?.trim() ? action.name.slice(0, 80) : session.name,
-          draftType,
-          teams,
-          players,
-          skippedPicks: []
-        });
+        skippedPicks = [];
       }
       return snapshot(store, {
         ...session,
         name: action.name?.trim() ? action.name.slice(0, 80) : session.name,
         draftType,
         teams,
-        players
+        players,
+        skippedPicks
       });
     }
     case "reorderTeam": {
@@ -5847,19 +5876,27 @@ function reduceSession(store, action) {
         players: [...session.players, toPlayer(action.input)]
       });
     }
-    case "editPlayer":
+    case "editPlayer": {
+      const existing = session.players.find((player) => player.id === action.id);
+      if (!existing) return store;
+      const nextName = action.input.name !== void 0 ? action.input.name.trim() : existing.name;
+      if (!nextName) return store;
       return snapshot(store, {
         ...session,
         players: session.players.map(
-          (player) => player.id === action.id ? toPlayer({ ...player, ...action.input, name: action.input.name ?? player.name }, player) : player
+          (player) => player.id === action.id ? toPlayer({ ...player, ...action.input, name: nextName }, player) : player
         )
       });
+    }
     case "recordPick": {
       const player = session.players.find((item) => item.id === action.playerId);
       const team = session.teams.find((item) => item.id === action.teamId);
       if (!player || player.status !== "available" || !team) return store;
       const skippedPicks = normalizeSkippedPicks(session.skippedPicks);
       const pickNumber = nextOpenPick(session.players, maxPicks(session), skippedPicks);
+      if (pickNumber > maxPicks(session)) return store;
+      const onClock = teamForPick(session.teams, pickNumber, session.draftType).team;
+      if (onClock.id !== team.id) return store;
       return snapshot(store, {
         ...session,
         skippedPicks: withoutSkippedPick(skippedPicks, pickNumber),
@@ -5935,13 +5972,14 @@ function reduceSession(store, action) {
       if (player.status !== "available" && player.status !== "assigned" && player.status !== "drafted" && player.status !== "my_team" && player.status !== "captain") {
         return store;
       }
+      const keepPick = player.pickNumber != null;
       return snapshot(store, {
         ...session,
         players: session.players.map(
           (item) => item.id === player.id ? {
             ...item,
-            status: "assigned",
-            pickNumber: null,
+            status: keepPick ? team.isUs ? "my_team" : "drafted" : "assigned",
+            pickNumber: keepPick ? player.pickNumber : null,
             draftedByTeamId: team.id,
             captainOfTeamId: null
           } : item
@@ -6063,16 +6101,25 @@ function createRoomService(store) {
       if (!action || typeof action !== "object" || !ALLOWED_ACTIONS.has(action.type)) {
         throw new RoomError("That action cannot be synced.", 400);
       }
+      if (action.type === "undo") {
+        throw new RoomError("Undo is only available in sandbox mode.", 400);
+      }
       const room = await requireAuthorized(id, token);
+      const expectedVersion = room.version;
       const next = reduceSession(room.store, action);
       const changed = next !== room.store;
+      if (!changed) return payload(room, token);
+      const latest = await store.get(id);
+      if (!latest || latest.version !== expectedVersion) {
+        throw new RoomError("Room was updated by someone else. Try again.", 409);
+      }
       const saved = {
-        ...room,
-        version: changed ? room.version + 1 : room.version,
-        updatedAt: changed ? (/* @__PURE__ */ new Date()).toISOString() : room.updatedAt,
+        ...latest,
+        version: latest.version + 1,
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
         store: next
       };
-      if (changed) await store.save(saved);
+      await store.save(saved);
       return payload(saved, token);
     }
   };

@@ -15,6 +15,7 @@ type RosterPanelProps = {
   onCaptainTeamId: (id: string) => void;
   onAssignTeamId: (id: string) => void;
   onRecordPick: (id: string) => void;
+  canRecordPick?: boolean;
   onMarkCaptain: (id: string) => void;
   onAssignOutsideDraft: (id: string) => void;
   onRestore: (id: string) => void;
@@ -32,6 +33,7 @@ export function RosterPanel({
   onCaptainTeamId,
   onAssignTeamId,
   onRecordPick,
+  canRecordPick = true,
   onMarkCaptain,
   onAssignOutsideDraft,
   onRestore,
@@ -125,8 +127,9 @@ export function RosterPanel({
                 </div>
                 <button
                   type="button"
-                  className={`${ourTurn ? primaryButtonClass : 'inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-coral px-4 text-sm font-bold text-white hover:bg-[#ca3f31]'} h-11 w-full`}
+                  className={`${ourTurn ? primaryButtonClass : 'inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-coral px-4 text-sm font-bold text-white hover:bg-[#ca3f31]'} h-11 w-full disabled:cursor-not-allowed disabled:opacity-40`}
                   onClick={() => onRecordPick(selected.id)}
+                  disabled={!canRecordPick}
                 >
                   {ourTurn ? 'Take for our team' : `Mark picked by ${onClockName}`}
                 </button>
