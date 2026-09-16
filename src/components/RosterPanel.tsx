@@ -9,11 +9,14 @@ type RosterPanelProps = {
   session: DraftSession;
   selected: Player | undefined;
   captainTeamId: string;
+  assignTeamId: string;
   ourTurn: boolean;
   onClockName: string;
   onCaptainTeamId: (id: string) => void;
+  onAssignTeamId: (id: string) => void;
   onRecordPick: (id: string) => void;
   onMarkCaptain: (id: string) => void;
+  onAssignOutsideDraft: (id: string) => void;
   onRestore: (id: string) => void;
   onSelect: (id: string) => void;
   onEdit: (id: string, patch: Partial<PlayerInput>) => void;
@@ -23,20 +26,38 @@ export function RosterPanel({
   session,
   selected,
   captainTeamId,
+  assignTeamId,
   ourTurn,
   onClockName,
   onCaptainTeamId,
+  onAssignTeamId,
   onRecordPick,
   onMarkCaptain,
+  onAssignOutsideDraft,
   onRestore,
   onSelect,
   onEdit,
 }: RosterPanelProps) {
+  const ourTeam = session.teams.find((team) => team.isUs);
   const mine = session.players
-    .filter((player) => player.status === 'my_team')
-    .sort((a, b) => (a.pickNumber ?? 0) - (b.pickNumber ?? 0));
-  const counts = rosterCounts(session.players);
+    .filter(
+      (player) =>
+        player.status === 'my_team' ||
+        (player.status === 'assigned' && player.draftedByTeamId === ourTeam?.id),
+    )
+    .sort((a, b) => {
+      if (a.pickNumber != null && b.pickNumber != null) return a.pickNumber - b.pickNumber;
+      if (a.pickNumber != null) return -1;
+      if (b.pickNumber != null) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  const counts = rosterCounts(session.players, ourTeam?.id);
   const otherTeams = session.teams.filter((team) => !team.isUs);
+  const selectedTeamId = selected
+    ? selected.draftedByTeamId ?? selected.captainOfTeamId
+    : null;
+  const selectedTeam = session.teams.find((team) => team.id === selectedTeamId);
+  const canMoveAssign = Boolean(selected && assignTeamId !== selectedTeamId);
 
   return (
     <aside className="space-y-4">
@@ -51,6 +72,9 @@ export function RosterPanel({
             <p className="mt-1 text-sm text-slate-500">
               {selected.position}
               {selected.classYear ? ` · ${selected.classYear}` : ''}
+              {selected.status !== 'available' && selectedTeam
+                ? ` · ${selectedTeam.name}${selected.pickNumber != null ? ` #${selected.pickNumber}` : selected.status === 'captain' ? ' · Captain' : ' · Assigned'}`
+                : ''}
             </p>
             {selected.status === 'available' ? (
               <label className="mt-3 grid gap-1 text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -106,6 +130,14 @@ export function RosterPanel({
                 >
                   {ourTurn ? 'Take for our team' : `Mark picked by ${onClockName}`}
                 </button>
+                <AssignTeamControls
+                  session={session}
+                  assignTeamId={assignTeamId}
+                  onAssignTeamId={onAssignTeamId}
+                  onAssign={() => onAssignOutsideDraft(selected.id)}
+                  label="Assign without pick"
+                  disabled={false}
+                />
                 <label className="grid gap-1 text-xs font-bold uppercase tracking-wider text-slate-500">
                   Other team captain
                   <select
@@ -126,14 +158,24 @@ export function RosterPanel({
               </div>
             )}
             {selected.status !== 'available' && (
-              <button type="button" className={`${secondaryButtonClass} mt-4 w-full`} onClick={() => onRestore(selected.id)}>
-                <Undo2 className="size-4" />
-                Return to available
-              </button>
+              <div className="mt-4 grid gap-3">
+                <AssignTeamControls
+                  session={session}
+                  assignTeamId={assignTeamId}
+                  onAssignTeamId={onAssignTeamId}
+                  onAssign={() => onAssignOutsideDraft(selected.id)}
+                  label="Move to team"
+                  disabled={!canMoveAssign}
+                />
+                <button type="button" className={`${secondaryButtonClass} w-full`} onClick={() => onRestore(selected.id)}>
+                  <Undo2 className="size-4" />
+                  Return to available
+                </button>
+              </div>
             )}
           </>
         ) : (
-          <p className="mt-2 text-sm text-slate-500">Select anyone in the available pool to scout or mark them.</p>
+          <p className="mt-2 text-sm text-slate-500">Select anyone in the available pool or a roster to scout or move them.</p>
         )}
       </div>
 
@@ -152,13 +194,55 @@ export function RosterPanel({
               className="block w-full text-left"
               onClick={() => onSelect(player.id)}
             >
-              <RosterRow player={player} teamLabel={`#${player.pickNumber}`} />
+              <RosterRow
+                player={player}
+                teamLabel={player.pickNumber != null ? `#${player.pickNumber}` : 'Assigned'}
+              />
             </button>
           ))}
           {mine.length === 0 && <p className="text-sm text-slate-500">No picks yet.</p>}
         </div>
       </div>
     </aside>
+  );
+}
+
+function AssignTeamControls({
+  session,
+  assignTeamId,
+  onAssignTeamId,
+  onAssign,
+  label,
+  disabled,
+}: {
+  session: DraftSession;
+  assignTeamId: string;
+  onAssignTeamId: (id: string) => void;
+  onAssign: () => void;
+  label: string;
+  disabled: boolean;
+}) {
+  return (
+    <>
+      <label className="grid gap-1 text-xs font-bold uppercase tracking-wider text-slate-500">
+        Assign to team
+        <select
+          className={inputClass}
+          value={assignTeamId}
+          onChange={(event) => onAssignTeamId(event.target.value)}
+        >
+          {session.teams.map((team) => (
+            <option key={team.id} value={team.id}>
+              {team.name}
+              {team.isUs ? ' (us)' : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="button" className={secondaryButtonClass} onClick={onAssign} disabled={disabled}>
+        {label}
+      </button>
+    </>
   );
 }
 
@@ -182,4 +266,3 @@ function RosterRow({
     </div>
   );
 }
-

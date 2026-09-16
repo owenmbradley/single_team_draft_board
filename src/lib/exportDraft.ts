@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { maxPicks, teamForPick } from '@/lib/draftOrder';
-import { teamCaptains, teamPicks } from '@/lib/listPlayers';
+import { teamAssigned, teamCaptains, teamPicks } from '@/lib/listPlayers';
 import { formatOverall, formatRating, overall } from '@/lib/ratings';
 import type { DraftSession, Player } from '@/types';
 
@@ -13,8 +13,9 @@ export function isDraftComplete(session: DraftSession): boolean {
 
 export function canExportDraft(session: DraftSession): boolean {
   return session.players.some(
-    (player) => player.pickNumber != null || player.status === 'captain',
-  );
+    (player) =>
+      player.pickNumber != null || player.status === 'captain' || player.status === 'assigned',
+  ) || (session.skippedPicks?.length ?? 0) > 0;
 }
 
 export function exportFileName(session: DraftSession): string {
@@ -60,21 +61,27 @@ export function downloadDraftExport(session: DraftSession): void {
 function summaryRows(session: DraftSession) {
   const picks = session.players.filter((player) => player.pickNumber != null).length;
   const captains = session.players.filter((player) => player.status === 'captain').length;
+  const assigned = session.players.filter((player) => player.status === 'assigned').length;
+  const skipped = session.skippedPicks?.length ?? 0;
   return [
     { Field: 'Draft', Value: session.name },
     { Field: 'Type', Value: session.draftType === 'linear' ? 'Linear' : 'Snake' },
     { Field: 'Teams', Value: session.teams.length },
     { Field: 'Rounds', Value: session.rounds },
     { Field: 'Picks made', Value: picks },
+    { Field: 'Skipped picks', Value: skipped },
     { Field: 'Captains', Value: captains },
+    { Field: 'Assigned outside draft', Value: assigned },
     { Field: 'Still available', Value: session.players.filter((player) => player.status === 'available').length },
     { Field: 'Complete', Value: isDraftComplete(session) ? 'Yes' : 'No' },
   ];
 }
 
 function boardRows(session: DraftSession) {
+  const skipped = new Set(session.skippedPicks ?? []);
   const last = Math.max(
     ...session.players.map((player) => player.pickNumber ?? 0),
+    ...(session.skippedPicks ?? []),
     session.currentPick - 1,
   );
   const end = Math.min(maxPicks(session), Math.max(last, 0));
@@ -88,17 +95,18 @@ function boardRows(session: DraftSession) {
     const pick = index + 1;
     const { team, round } = teamForPick(session.teams, pick, session.draftType);
     const player = assigned.get(pick);
+    const isSkip = skipped.has(pick);
     return {
       Pick: pick,
       Round: round,
       Team: team.name,
-      Player: player?.name ?? '',
+      Player: player?.name ?? (isSkip ? 'SKIP' : ''),
       Position: player?.position ?? '',
       Talent: player ? formatRating(player.talent) : '',
       Vibes: player ? formatRating(player.vibes) : '',
       Total: player ? formatOverall(player.talent, player.vibes) : '',
       Class: player?.classYear ?? '',
-      Notes: player?.notes ?? '',
+      Notes: player?.notes ?? (isSkip ? 'Skipped pick' : ''),
     };
   });
 }
@@ -111,13 +119,19 @@ function rosterRows(session: DraftSession) {
       Pick: '',
       ...playerFields(player),
     }));
+    const assigned = teamAssigned(session.players, team.id).map((player) => ({
+      Team: team.name,
+      Role: 'Assigned',
+      Pick: '',
+      ...playerFields(player),
+    }));
     const picks = teamPicks(session.players, team.id).map((player) => ({
       Team: team.name,
       Role: 'Pick',
       Pick: player.pickNumber ?? '',
       ...playerFields(player),
     }));
-    return [...captains, ...picks];
+    return [...captains, ...assigned, ...picks];
   });
 }
 

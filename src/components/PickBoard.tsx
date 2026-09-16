@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { maxPicks, teamForPick, type MoveDirection } from '@/lib/draftOrder';
-import { teamPicks } from '@/lib/listPlayers';
+import { teamAssigned, teamCaptains, teamPicks } from '@/lib/listPlayers';
 import type { DraftSession } from '@/types';
 
 /** Approx chip width including gap — keeps the strip from needing horizontal scroll. */
@@ -74,7 +74,10 @@ export function PickBoard({
         <p className="eyebrow shrink-0 text-slate-400">Teams</p>
         <div className="flex min-w-0 flex-1 flex-wrap gap-1">
           {teams.map((team, index) => {
-            const count = teamPicks(session.players, team.id).length;
+            const count =
+              teamPicks(session.players, team.id).length +
+              teamAssigned(session.players, team.id).length +
+              teamCaptains(session.players, team.id).length;
             const onClock = team.id === onClockId;
             if (editingOrder) {
               return (
@@ -145,30 +148,37 @@ export function PickBoard({
         <ol ref={stripRef} className="flex min-w-0 flex-1 gap-1 overflow-hidden">
           {rows.map(({ pick, team, round }) => {
             const player = assigned.get(pick);
+            const skipped = (session.skippedPicks ?? []).includes(pick);
             const isCurrent = pick === session.currentPick;
+            const canCorrect = Boolean(player || skipped || pick < session.currentPick);
             return (
               <li key={pick} className="min-w-0 flex-1 basis-0">
                 <button
                   type="button"
                   aria-label={
-                    correctionMode && (player || pick < session.currentPick)
+                    correctionMode && canCorrect
                       ? `Correct pick ${pick}`
                       : `${team.name} roster`
                   }
                   onClick={() => {
-                    if (correctionMode && onCorrectPick && (player || pick < session.currentPick)) {
+                    if (correctionMode && onCorrectPick && canCorrect) {
                       onCorrectPick(pick);
                       return;
                     }
                     onOpenTeam(team.id);
                   }}
                   className={`inline-flex h-7 w-full items-center gap-1.5 rounded-md border px-2 text-left ${chipTone(isCurrent, team.isUs)} ${
-                    correctionMode && player ? 'ring-1 ring-mint/40' : ''
+                    correctionMode && (player || skipped) ? 'ring-1 ring-mint/40' : ''
                   }`}
                 >
                   <span className="shrink-0 font-mono text-[10px] font-bold text-slate-400">#{pick}</span>
-                  <span className={`truncate text-xs font-semibold ${player ? 'text-white' : 'text-slate-400'}`}>
-                    {player?.name ?? (isCurrent ? 'On the clock' : `${team.name} R${round}`)}
+                  <span
+                    className={`truncate text-xs font-semibold ${
+                      player || skipped ? 'text-white' : 'text-slate-400'
+                    }`}
+                  >
+                    {player?.name ??
+                      (skipped ? 'Skipped' : isCurrent ? 'On the clock' : `${team.name} R${round}`)}
                   </span>
                 </button>
               </li>

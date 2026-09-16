@@ -5,6 +5,7 @@ import {
   defaultSortDir,
   filterPlayers,
   pruneClassFilter,
+  teamAssigned,
   teamCaptains,
   teamPicks,
 } from '@/lib/listPlayers';
@@ -112,6 +113,7 @@ describe('player list filters', () => {
       player('Ada Cole', { status: 'my_team', pickNumber: 3, draftedByTeamId: 'team-us' }),
       player('Bo Hale', { status: 'drafted', pickNumber: 1, draftedByTeamId: 'team-1' }),
       player('Cal Pike', { status: 'captain', captainOfTeamId: 'team-1' }),
+      player('Dee Moss', { status: 'assigned', draftedByTeamId: 'team-1' }),
     ];
 
     expect(
@@ -123,9 +125,10 @@ describe('player list filters', () => {
         sortKey: 'name',
         sortDir: 'asc',
       }).map((item) => item.name),
-    ).toEqual(['Ada Cole', 'Bo Hale']);
+    ).toEqual(['Ada Cole', 'Bo Hale', 'Dee Moss']);
 
     expect(teamPicks(taken, 'team-1').map((item) => item.name)).toEqual(['Bo Hale']);
     expect(teamCaptains(taken, 'team-1').map((item) => item.name)).toEqual(['Cal Pike']);
+    expect(teamAssigned(taken, 'team-1').map((item) => item.name)).toEqual(['Dee Moss']);
   });
 });

@@ -27,6 +27,8 @@ type AvailableListProps = {
   onSort: (key: SortKey) => void;
   onSelect: (id: string) => void;
   onRecordPick: (id: string) => void;
+  onSkipPick: () => void;
+  canSkip: boolean;
   ourTurn: boolean;
   onClockName: string;
 };
@@ -49,6 +51,8 @@ export function AvailableList({
   onSort,
   onSelect,
   onRecordPick,
+  onSkipPick,
+  canSkip,
   ourTurn,
   onClockName,
 }: AvailableListProps) {
@@ -68,13 +72,24 @@ export function AvailableList({
             <PoolButton label="Available" active={!showingTaken} onClick={() => onPool('available')} />
             <PoolButton label="Taken" active={showingTaken} onClick={() => onPool('taken')} />
           </div>
-          <p className="text-sm font-semibold text-slate-500">
-            {showingTaken
-              ? `${players.length} taken`
-              : ourTurn
-                ? 'Your pick — Take'
-                : `${onClockName} is on the clock — Mark Picked`}
-          </p>
+          {!showingTaken && (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-slate-500">
+                {ourTurn ? 'Your pick — Take' : `${onClockName} is on the clock — Mark Picked`}
+              </p>
+              <button
+                type="button"
+                className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={onSkipPick}
+                disabled={!canSkip}
+              >
+                Skip {onClockName}
+              </button>
+            </div>
+          )}
+          {showingTaken && (
+            <p className="text-sm font-semibold text-slate-500">{players.length} taken</p>
+          )}
         </div>
       </div>
 
@@ -270,7 +285,11 @@ function TakenMeta({ player, teams }: { player: Player; teams: Team[] }) {
     <div className="leading-tight">
       <p className="text-xs font-bold text-ice">{team?.name ?? 'Taken'}</p>
       <p className="text-[11px] font-semibold text-slate-500">
-        {player.pickNumber != null ? `#${player.pickNumber}` : 'No pick'}
+        {player.pickNumber != null
+          ? `#${player.pickNumber}`
+          : player.status === 'assigned'
+            ? 'Assigned'
+            : 'No pick'}
       </p>
     </div>
   );

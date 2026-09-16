@@ -74,6 +74,25 @@ describe('draft export', () => {
     );
   });
 
+  it('exports out-of-cycle assignments on the roster sheet', () => {
+    let store = createStore();
+    store = reduceSession(store, { type: 'addPlayer', input: miles });
+    store = reduceSession(store, {
+      type: 'assignOutsideDraft',
+      playerId: store.session.players[0].id,
+      teamId: store.session.teams[0].id,
+    });
+
+    expect(canExportDraft(store.session)).toBe(true);
+    const workbook = buildDraftWorkbook(store.session);
+    const rosters = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.Rosters);
+    expect(rosters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ Team: 'Team 1', Role: 'Assigned', Player: 'Miles Irwin' }),
+      ]),
+    );
+  });
+
   it('names the file from the draft title', () => {
     expect(exportFileName({ name: 'Tripod Hockey Draft' } as never)).toBe('tripod-hockey-draft.xlsx');
   });

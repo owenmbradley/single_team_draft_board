@@ -18,7 +18,7 @@ import {
   type RoomConnection,
 } from '@/lib/roomConnection';
 import { readRoom, type RoomPayload } from '@/lib/roomsApi';
-import { ourUpcomingPicks, teamForPick } from '@/lib/draftOrder';
+import { maxPicks, ourUpcomingPicks, teamForPick } from '@/lib/draftOrder';
 import { parsePlayerWorkbook } from '@/lib/importPlayers';
 import {
   filterPlayers,
@@ -31,7 +31,7 @@ import {
   type SortKey,
 } from '@/lib/listPlayers';
 import { normalizeName } from '@/lib/ratings';
-import { lastFilledPick } from '@/lib/correctPick';
+import { lastOccupiedPick } from '@/lib/correctPick';
 import { canExportDraft, downloadDraftExport, isDraftComplete } from '@/lib/exportDraft';
 import { createSeededSession, createStore, playerById, reduceSession } from '@/lib/session';
 import { clearSavedSession } from '@/lib/storage';
@@ -52,6 +52,7 @@ export default function App() {
   const [captainTeamId, setCaptainTeamId] = useState(
     session.teams.find((team) => !team.isUs)?.id ?? session.teams[0].id,
   );
+  const [assignTeamId, setAssignTeamId] = useState(session.teams[0]?.id ?? '');
   const [dialog, setDialog] = useState<'import' | 'add' | 'setup' | 'correct' | null>(null);
   const [view, setView] = useState<'draft' | 'plan'>('draft');
   const [correctionMode, setCorrectionMode] = useState(false);
@@ -113,14 +114,22 @@ export default function App() {
     }
   }, [session.teams, captainTeamId]);
 
+  useEffect(() => {
+    if (!session.teams.some((team) => team.id === assignTeamId)) {
+      const fallback = session.teams[0];
+      if (fallback) setAssignTeamId(fallback.id);
+    }
+  }, [session.teams, assignTeamId]);
+
   const selected = playerById(session, selectedId);
   const onClock = teamForPick(session.teams, session.currentPick, session.draftType).team;
   const nextOurs = ourUpcomingPicks(session, 1)[0];
   const availableCount = session.players.filter((player) => player.status === 'available').length;
   const draftedCount = session.players.filter(
-    (player) => player.status === 'drafted' || player.status === 'my_team',
+    (player) =>
+      player.status === 'drafted' || player.status === 'my_team' || player.status === 'assigned',
   ).length;
-  const filledPicks = lastFilledPick(session.players);
+  const filledPicks = lastOccupiedPick(session);
   const exportReady = canExportDraft(session);
   const draftDone = isDraftComplete(session);
 
@@ -177,6 +186,22 @@ export default function App() {
     const team = session.teams.find((item) => item.id === captainTeamId);
     if (!team || team.isUs) return;
     commit({ type: 'markCaptain', playerId, teamId: team.id });
+    setSelectedId(null);
+  };
+
+  const selectPlayer = (playerId: string) => {
+    setSelectedId(playerId);
+    const player = session.players.find((item) => item.id === playerId);
+    const currentTeamId = player?.draftedByTeamId ?? player?.captainOfTeamId;
+    if (!currentTeamId) return;
+    const otherTeam = session.teams.find((team) => team.id !== currentTeamId);
+    if (otherTeam) setAssignTeamId(otherTeam.id);
+  };
+
+  const assignOutsideDraft = (playerId: string) => {
+    const team = session.teams.find((item) => item.id === assignTeamId);
+    if (!team) return;
+    commit({ type: 'assignOutsideDraft', playerId, teamId: team.id });
     setSelectedId(null);
   };
 
@@ -379,7 +404,7 @@ export default function App() {
             onPosition={setPosition}
             onClassYear={setClassYear}
             onSort={changeSort}
-            onSelect={setSelectedId}
+            onSelect={selectPlayer}
             onEdit={(id, patch) => commit({ type: 'editPlayer', id, input: patch })}
             onBackToDraft={() => setView('draft')}
           />
@@ -403,8 +428,10 @@ export default function App() {
               onPosition={setPosition}
               onClassYear={setClassYear}
               onSort={changeSort}
-              onSelect={setSelectedId}
+              onSelect={selectPlayer}
               onRecordPick={recordClockPick}
+              onSkipPick={() => commit({ type: 'skipPick' })}
+              canSkip={session.currentPick <= maxPicks(session)}
               ourTurn={onClock.isUs}
               onClockName={onClock.name}
             />
@@ -414,15 +441,18 @@ export default function App() {
               session={session}
               selected={selected}
               captainTeamId={captainTeamId}
+              assignTeamId={assignTeamId}
               ourTurn={onClock.isUs}
               onClockName={onClock.name}
               onCaptainTeamId={setCaptainTeamId}
+              onAssignTeamId={setAssignTeamId}
               onRecordPick={recordClockPick}
               onMarkCaptain={markCaptain}
+              onAssignOutsideDraft={assignOutsideDraft}
               onRestore={(id) => {
                 commit({ type: 'restorePlayer', playerId: id });
               }}
-              onSelect={setSelectedId}
+              onSelect={selectPlayer}
               onEdit={(id, patch) => commit({ type: 'editPlayer', id, input: patch })}
             />
           </div>
@@ -457,7 +487,7 @@ export default function App() {
           session={session}
           teamId={rosterTeamId}
           onClose={() => setRosterTeamId(null)}
-          onSelect={setSelectedId}
+          onSelect={selectPlayer}
         />
       )}
       {dialog === 'setup' && (
@@ -475,7 +505,7 @@ export default function App() {
             });
           }}
           onResetPicks={() => {
-            if (!window.confirm('Clear every pick and keep the player ratings? Captains stay marked.')) return;
+            if (!window.confirm('Clear every pick and out-of-cycle assignment, and keep the player ratings? Captains stay marked. Skipped picks are cleared.')) return;
             commit({ type: 'resetPicks' });
           }}
           onClearPlayers={() => {

@@ -66,6 +66,118 @@ describe('draft session', () => {
     expect(store.session.currentPick).toBe(1);
   });
 
+  it('moves an assigned player to another team without consuming a pick', () => {
+    let store = createStore();
+    store = reduceSession(store, { type: 'addPlayer', input: miles });
+    const [first, second] = store.session.teams;
+    store = reduceSession(store, {
+      type: 'assignOutsideDraft',
+      playerId: store.session.players[0].id,
+      teamId: first.id,
+    });
+    store = reduceSession(store, {
+      type: 'assignOutsideDraft',
+      playerId: store.session.players[0].id,
+      teamId: second.id,
+    });
+    expect(store.session.players[0]).toMatchObject({
+      status: 'assigned',
+      pickNumber: null,
+      draftedByTeamId: second.id,
+    });
+    expect(store.session.currentPick).toBe(1);
+  });
+
+  it('assigns a player to any team without consuming a draft pick', () => {
+    let store = createStore();
+    store = reduceSession(store, { type: 'addPlayer', input: miles });
+    store = reduceSession(store, { type: 'addPlayer', input: pat });
+    const ourTeam = store.session.teams.find((team) => team.isUs);
+    const otherTeam = store.session.teams.find((team) => !team.isUs);
+    if (!ourTeam || !otherTeam) throw new Error('expected teams');
+
+    store = reduceSession(store, {
+      type: 'assignOutsideDraft',
+      playerId: store.session.players[0].id,
+      teamId: ourTeam.id,
+    });
+    expect(store.session.players[0]).toMatchObject({
+      status: 'assigned',
+      pickNumber: null,
+      draftedByTeamId: ourTeam.id,
+    });
+    expect(store.session.currentPick).toBe(1);
+
+    store = reduceSession(store, {
+      type: 'recordPick',
+      playerId: store.session.players[1].id,
+      teamId: otherTeam.id,
+    });
+    expect(store.session.players[1]).toMatchObject({
+      status: 'drafted',
+      pickNumber: 1,
+    });
+    expect(store.session.currentPick).toBe(2);
+
+    store = reduceSession(store, { type: 'resetPicks' });
+    expect(store.session.players[0].status).toBe('available');
+    expect(store.session.players[0].draftedByTeamId).toBeNull();
+    expect(store.session.players[1].status).toBe('available');
+    expect(store.session.currentPick).toBe(1);
+  });
+
+  it('skips the team on the clock without assigning a player', () => {
+    let store = createStore();
+    store = reduceSession(store, { type: 'addPlayer', input: miles });
+    const firstTeam = store.session.teams[0];
+
+    store = reduceSession(store, { type: 'skipPick' });
+    expect(store.session.skippedPicks).toEqual([1]);
+    expect(store.session.currentPick).toBe(2);
+
+    store = reduceSession(store, {
+      type: 'recordPick',
+      playerId: store.session.players[0].id,
+      teamId: store.session.teams[1].id,
+    });
+    expect(store.session.players[0]).toMatchObject({
+      pickNumber: 2,
+      draftedByTeamId: store.session.teams[1].id,
+    });
+    expect(store.session.currentPick).toBe(3);
+    expect(store.session.skippedPicks).toEqual([1]);
+
+    store = reduceSession(store, { type: 'clearPick', pickNumber: 1 });
+    expect(store.session.skippedPicks).toEqual([]);
+    expect(store.session.currentPick).toBe(1);
+    expect(firstTeam.id).toBe(store.session.teams[0].id);
+  });
+
+  it('keeps the clock from snapping back when a drafted player fills a skip', () => {
+    let store = createStore();
+    store = reduceSession(store, { type: 'addPlayer', input: miles });
+    store = reduceSession(store, { type: 'addPlayer', input: pat });
+    store = reduceSession(store, { type: 'skipPick' });
+    store = reduceSession(store, {
+      type: 'recordPick',
+      playerId: store.session.players[0].id,
+      teamId: store.session.teams[1].id,
+    });
+    expect(store.session).toMatchObject({
+      currentPick: 3,
+      skippedPicks: [1],
+    });
+
+    store = reduceSession(store, {
+      type: 'correctPick',
+      pickNumber: 1,
+      playerId: store.session.players[0].id,
+    });
+    expect(store.session.players[0].pickNumber).toBe(1);
+    expect(store.session.skippedPicks).toEqual([2]);
+    expect(store.session.currentPick).toBe(3);
+  });
+
   it('merges imported ratings without wiping players already off the board', () => {
     let store = createStore();
     store = reduceSession(store, { type: 'addPlayer', input: miles });

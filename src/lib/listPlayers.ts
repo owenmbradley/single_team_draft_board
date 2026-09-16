@@ -84,8 +84,12 @@ export function filterPlayers(
     .sort((a, b) => comparePlayers(a, b, options.sortKey, options.sortDir));
 }
 
-export function rosterCounts(players: Player[]): { skaters: number; goalies: number } {
-  const mine = players.filter((player) => player.status === 'my_team');
+export function rosterCounts(players: Player[], ourTeamId?: string): { skaters: number; goalies: number } {
+  const mine = players.filter(
+    (player) =>
+      player.status === 'my_team' ||
+      (player.status === 'assigned' && ourTeamId != null && player.draftedByTeamId === ourTeamId),
+  );
   return {
     skaters: mine.filter((player) => player.position === 'Skater').length,
     goalies: mine.filter((player) => player.position === 'Goalie').length,
@@ -94,7 +98,9 @@ export function rosterCounts(players: Player[]): { skaters: number; goalies: num
 
 export function matchesStatus(player: Player, status: StatusFilter): boolean {
   if (status === 'all') return true;
-  if (status === 'taken') return player.status === 'drafted' || player.status === 'my_team';
+  if (status === 'taken') {
+    return player.status === 'drafted' || player.status === 'my_team' || player.status === 'assigned';
+  }
   return player.status === status;
 }
 
@@ -106,4 +112,10 @@ export function teamPicks(players: Player[], teamId: string): Player[] {
 
 export function teamCaptains(players: Player[], teamId: string): Player[] {
   return players.filter((player) => player.status === 'captain' && player.captainOfTeamId === teamId);
+}
+
+export function teamAssigned(players: Player[], teamId: string): Player[] {
+  return players
+    .filter((player) => player.status === 'assigned' && player.draftedByTeamId === teamId)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

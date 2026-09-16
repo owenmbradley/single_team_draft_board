@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Dialog, inputClass, secondaryButtonClass } from '@/components/Dialog';
-import { lastFilledPick, playerOnPick } from '@/lib/correctPick';
+import { isSkippedPick, lastOccupiedPick, playerOnPick } from '@/lib/correctPick';
 import { teamForPick } from '@/lib/draftOrder';
 import type { DraftSession, Player } from '@/types';
 
@@ -20,11 +20,12 @@ export function CorrectPicksDialog({
   onCorrect,
   onClear,
 }: CorrectPicksDialogProps) {
-  const lastPick = lastFilledPick(session.players);
+  const lastPick = lastOccupiedPick(session);
   const pickNumbers = Array.from({ length: lastPick }, (_, index) => index + 1);
   const [pickNumber, setPickNumber] = useState(initialPick && initialPick <= lastPick ? initialPick : lastPick);
   const [query, setQuery] = useState('');
   const current = playerOnPick(session.players, pickNumber);
+  const skipped = isSkippedPick(session, pickNumber);
   const pickTeam = pickNumber > 0 ? teamForPick(session.teams, pickNumber, session.draftType).team : undefined;
 
   const candidates = useMemo(() => {
@@ -39,7 +40,7 @@ export function CorrectPicksDialog({
     <Dialog title="Correct a pick" onClose={onClose} wide>
       <p className="text-sm text-slate-500">
         Change who went in a past slot. Later picks stay on their numbers. Choosing someone already
-        taken swaps the two.
+        taken swaps the two. Skipped slots can be filled or cleared.
       </p>
       {lastPick === 0 ? (
         <p className="mt-4 text-sm font-semibold text-slate-500">No picks to correct yet.</p>
@@ -51,6 +52,7 @@ export function CorrectPicksDialog({
               {pickNumbers.map((pick) => {
                 const player = playerOnPick(session.players, pick);
                 const team = teamForPick(session.teams, pick, session.draftType).team;
+                const pickSkipped = isSkippedPick(session, pick);
                 const selected = pick === pickNumber;
                 return (
                   <button
@@ -70,8 +72,12 @@ export function CorrectPicksDialog({
                         {team.name}
                       </span>
                     </div>
-                    <p className={`mt-1 truncate text-sm font-semibold ${player ? 'text-ice' : 'text-slate-400'}`}>
-                      {player?.name ?? 'Empty slot'}
+                    <p
+                      className={`mt-1 truncate text-sm font-semibold ${
+                        player || pickSkipped ? 'text-ice' : 'text-slate-400'
+                      }`}
+                    >
+                      {player?.name ?? (pickSkipped ? 'Skipped' : 'Empty slot')}
                     </p>
                   </button>
                 );
@@ -82,11 +88,15 @@ export function CorrectPicksDialog({
             <p className="eyebrow mb-2 text-slate-500">
               {pickTeam ? `Assign to #${pickNumber} · ${pickTeam.name}` : 'Choose a pick'}
             </p>
-            {current && (
+            {(current || skipped) && (
               <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{current.name}</p>
-                  <p className="text-[11px] text-slate-500">Currently assigned</p>
+                  <p className="truncate text-sm font-semibold">
+                    {current?.name ?? 'Skipped pick'}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    {current ? 'Currently assigned' : 'Penalty skip — no player'}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -107,12 +117,12 @@ export function CorrectPicksDialog({
               />
             </div>
             <div className="grid max-h-56 gap-1 overflow-y-auto pr-1">
-              {candidates.slice(0, 40).map((player) => (
+              {candidates.map((player) => (
                 <button
                   key={player.id}
                   type="button"
-                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-left hover:bg-slate-50"
                   aria-label={`Assign ${player.name} to pick ${pickNumber}`}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-left hover:bg-slate-50"
                   onClick={() => onCorrect(pickNumber, player.id)}
                 >
                   <span className="truncate text-sm font-semibold">{player.name}</span>
@@ -134,12 +144,13 @@ export function CorrectPicksDialog({
 
 function statusRank(player: Player): number {
   if (player.status === 'available') return 0;
-  if (player.status === 'captain') return 1;
+  if (player.status === 'captain' || player.status === 'assigned') return 1;
   return 2;
 }
 
 function candidateLabel(player: Player): string {
   if (player.status === 'available') return 'Available';
   if (player.status === 'captain') return 'Captain';
+  if (player.status === 'assigned') return 'Assigned';
   return player.pickNumber != null ? `Swap #${player.pickNumber}` : 'Taken';
 }

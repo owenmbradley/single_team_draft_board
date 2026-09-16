@@ -5,8 +5,17 @@ export function lastFilledPick(players: Player[]): number {
   return players.reduce((highest, player) => Math.max(highest, player.pickNumber ?? 0), 0);
 }
 
+export function lastOccupiedPick(session: DraftSession): number {
+  const skippedHighest = (session.skippedPicks ?? []).reduce((highest, pick) => Math.max(highest, pick), 0);
+  return Math.max(lastFilledPick(session.players), skippedHighest);
+}
+
 export function playerOnPick(players: Player[], pickNumber: number): Player | undefined {
   return players.find((player) => player.pickNumber === pickNumber);
+}
+
+export function isSkippedPick(session: DraftSession, pickNumber: number): boolean {
+  return (session.skippedPicks ?? []).includes(pickNumber);
 }
 
 export function applyPickCorrection(

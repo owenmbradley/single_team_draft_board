@@ -1,6 +1,6 @@
 export type Position = 'Skater' | 'Goalie';
 
-export type PlayerStatus = 'available' | 'my_team' | 'drafted' | 'captain';
+export type PlayerStatus = 'available' | 'my_team' | 'drafted' | 'captain' | 'assigned';
 
 export type Player = {
   id: string;
@@ -32,6 +32,8 @@ export type DraftSession = {
   currentPick: number;
   teams: Team[];
   players: Player[];
+  /** Pick numbers burned without assigning a player (penalties). */
+  skippedPicks: number[];
 };
 
 export type PlayerInput = {

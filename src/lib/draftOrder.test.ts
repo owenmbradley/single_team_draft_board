@@ -56,4 +56,9 @@ describe('snake draft order', () => {
     expect(nextOpenPick([{ pickNumber: 1 }, { pickNumber: 3 }] as never, 96)).toBe(2);
     expect(nextOpenPick([{ pickNumber: 1 }, { pickNumber: 2 }] as never, 96)).toBe(3);
   });
+
+  it('treats skipped picks as occupied when finding the next open slot', () => {
+    expect(nextOpenPick([{ pickNumber: 1 }] as never, 96, [2])).toBe(3);
+    expect(nextOpenPick([] as never, 96, [1, 2])).toBe(3);
+  });
 });

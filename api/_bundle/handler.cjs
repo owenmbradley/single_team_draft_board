@@ -5572,8 +5572,15 @@ function usedPickNumbers(players) {
     players.map((player) => player.pickNumber).filter((pick) => pick != null)
   );
 }
-function nextOpenPick(players, totalPicks) {
+function occupiedPickNumbers(players, skippedPicks = []) {
   const used = usedPickNumbers(players);
+  for (const pick of skippedPicks) {
+    if (pick > 0) used.add(pick);
+  }
+  return used;
+}
+function nextOpenPick(players, totalPicks, skippedPicks = []) {
+  const used = occupiedPickNumbers(players, skippedPicks);
   const limit = Math.max(1, totalPicks);
   for (let pick = 1; pick <= limit; pick += 1) {
     if (!used.has(pick)) return pick;
@@ -5661,20 +5668,34 @@ function createSession() {
     rounds: draftRounds(0, teams.length),
     currentPick: 1,
     teams,
-    players: []
+    players: [],
+    skippedPicks: []
   };
 }
 function createStore(session = createSession()) {
   return { session: withDerivedDraft(session), past: [] };
 }
+function normalizeSkippedPicks(value) {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(
+      value.map((pick) => typeof pick === "number" ? pick : Number(pick)).filter((pick) => Number.isInteger(pick) && pick > 0)
+    )
+  ].sort((a, b) => a - b);
+}
+function withoutSkippedPick(skippedPicks, pickNumber) {
+  return skippedPicks.filter((pick) => pick !== pickNumber);
+}
 function withDerivedDraft(session) {
   const draftType = normalizeDraftType(session.draftType);
   const rounds = draftRounds(session.players.length, session.teams.length);
+  const skippedPicks = normalizeSkippedPicks(session.skippedPicks);
   return {
     ...session,
     draftType,
     rounds,
-    currentPick: nextOpenPick(session.players, maxPicks({ ...session, rounds }))
+    skippedPicks,
+    currentPick: nextOpenPick(session.players, maxPicks({ ...session, rounds }), skippedPicks)
   };
 }
 function snapshot(store, next) {
@@ -5702,12 +5723,20 @@ function availablePlayer(input) {
   return toPlayer(input);
 }
 function resetAssignment(player) {
+  if (player.status === "captain") {
+    return {
+      ...player,
+      pickNumber: null,
+      draftedByTeamId: null,
+      captainOfTeamId: player.captainOfTeamId
+    };
+  }
   return {
     ...player,
-    status: player.status === "captain" ? "captain" : "available",
+    status: "available",
     pickNumber: null,
     draftedByTeamId: null,
-    captainOfTeamId: player.status === "captain" ? player.captainOfTeamId : null
+    captainOfTeamId: null
   };
 }
 function reduceSession(store, action) {
@@ -5731,10 +5760,27 @@ function reduceSession(store, action) {
         players = session.players.map((player) => ({
           ...resetAssignment(player),
           status: "available",
-          captainOfTeamId: null
+          captainOfTeamId: null,
+          draftedByTeamId: null
         }));
+        return snapshot(store, {
+          ...session,
+          name: action.name?.trim() ? action.name.slice(0, 80) : session.name,
+          draftType,
+          teams,
+          players,
+          skippedPicks: []
+        });
       } else if (orderChanged) {
         players = session.players.map(resetAssignment);
+        return snapshot(store, {
+          ...session,
+          name: action.name?.trim() ? action.name.slice(0, 80) : session.name,
+          draftType,
+          teams,
+          players,
+          skippedPicks: []
+        });
       }
       return snapshot(store, {
         ...session,
@@ -5747,8 +5793,14 @@ function reduceSession(store, action) {
     case "reorderTeam": {
       const teams = moveTeam(session.teams, action.teamId, action.direction);
       if (teams === session.teams) return store;
-      const players = session.players.some((player) => player.pickNumber != null) ? session.players.map(resetAssignment) : session.players;
-      return snapshot(store, { ...session, teams, players });
+      const hasOccupied = session.players.some((player) => player.pickNumber != null) || (session.skippedPicks?.length ?? 0) > 0;
+      const players = hasOccupied ? session.players.map(resetAssignment) : session.players;
+      return snapshot(store, {
+        ...session,
+        teams,
+        players,
+        skippedPicks: hasOccupied ? [] : session.skippedPicks ?? []
+      });
     }
     case "renameTeam":
       return snapshot(store, {
@@ -5761,7 +5813,8 @@ function reduceSession(store, action) {
       if (action.mode === "replace") {
         return snapshot(store, {
           ...session,
-          players: action.players.map(availablePlayer)
+          players: action.players.map(availablePlayer),
+          skippedPicks: []
         });
       }
       const existingByName = new Map(
@@ -5805,9 +5858,11 @@ function reduceSession(store, action) {
       const player = session.players.find((item) => item.id === action.playerId);
       const team = session.teams.find((item) => item.id === action.teamId);
       if (!player || player.status !== "available" || !team) return store;
-      const pickNumber = nextOpenPick(session.players, maxPicks(session));
+      const skippedPicks = normalizeSkippedPicks(session.skippedPicks);
+      const pickNumber = nextOpenPick(session.players, maxPicks(session), skippedPicks);
       return snapshot(store, {
         ...session,
+        skippedPicks: withoutSkippedPick(skippedPicks, pickNumber),
         players: session.players.map(
           (item) => item.id === player.id ? {
             ...item,
@@ -5819,15 +5874,42 @@ function reduceSession(store, action) {
         )
       });
     }
+    case "skipPick": {
+      const skippedPicks = normalizeSkippedPicks(session.skippedPicks);
+      const pickNumber = nextOpenPick(session.players, maxPicks(session), skippedPicks);
+      if (pickNumber > maxPicks(session)) return store;
+      return snapshot(store, {
+        ...session,
+        skippedPicks: [...skippedPicks, pickNumber].sort((a, b) => a - b)
+      });
+    }
     case "correctPick": {
+      const skippedPicks = normalizeSkippedPicks(session.skippedPicks);
+      const wasSkipped = skippedPicks.includes(action.pickNumber);
+      const incoming = session.players.find((player) => player.id === action.playerId);
+      const vacatedPick = incoming?.pickNumber ?? null;
       const players = applyPickCorrection(session, action.pickNumber, action.playerId);
       if (!players) return store;
-      return snapshot(store, { ...session, players });
+      let nextSkipped = withoutSkippedPick(skippedPicks, action.pickNumber);
+      if (wasSkipped && vacatedPick != null && vacatedPick !== action.pickNumber && !players.some((player) => player.pickNumber === vacatedPick)) {
+        nextSkipped = [...nextSkipped, vacatedPick].sort((a, b) => a - b);
+      }
+      return snapshot(store, {
+        ...session,
+        players,
+        skippedPicks: nextSkipped
+      });
     }
     case "clearPick": {
+      const skippedPicks = normalizeSkippedPicks(session.skippedPicks);
+      const wasSkipped = skippedPicks.includes(action.pickNumber);
       const players = clearPickAssignment(session, action.pickNumber);
-      if (!players) return store;
-      return snapshot(store, { ...session, players });
+      if (!players && !wasSkipped) return store;
+      return snapshot(store, {
+        ...session,
+        players: players ?? session.players,
+        skippedPicks: withoutSkippedPick(skippedPicks, action.pickNumber)
+      });
     }
     case "markCaptain": {
       const player = session.players.find((item) => item.id === action.playerId);
@@ -5842,6 +5924,26 @@ function reduceSession(store, action) {
             pickNumber: null,
             draftedByTeamId: null,
             captainOfTeamId: team.id
+          } : item
+        )
+      });
+    }
+    case "assignOutsideDraft": {
+      const player = session.players.find((item) => item.id === action.playerId);
+      const team = session.teams.find((item) => item.id === action.teamId);
+      if (!player || !team) return store;
+      if (player.status !== "available" && player.status !== "assigned" && player.status !== "drafted" && player.status !== "my_team" && player.status !== "captain") {
+        return store;
+      }
+      return snapshot(store, {
+        ...session,
+        players: session.players.map(
+          (item) => item.id === player.id ? {
+            ...item,
+            status: "assigned",
+            pickNumber: null,
+            draftedByTeamId: team.id,
+            captainOfTeamId: null
           } : item
         )
       });
@@ -5862,10 +5964,11 @@ function reduceSession(store, action) {
     case "resetPicks":
       return snapshot(store, {
         ...session,
-        players: session.players.map(resetAssignment)
+        players: session.players.map(resetAssignment),
+        skippedPicks: []
       });
     case "clearPlayers":
-      return snapshot(store, { ...session, players: [] });
+      return snapshot(store, { ...session, players: [], skippedPicks: [] });
     default:
       return store;
   }
@@ -5880,9 +5983,11 @@ var ALLOWED_ACTIONS = /* @__PURE__ */ new Set([
   "addPlayer",
   "editPlayer",
   "recordPick",
+  "skipPick",
   "correctPick",
   "clearPick",
   "markCaptain",
+  "assignOutsideDraft",
   "restorePlayer",
   "resetPicks",
   "clearPlayers",

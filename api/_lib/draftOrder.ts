@@ -81,8 +81,20 @@ export function usedPickNumbers(players: Player[]): Set<number> {
   );
 }
 
-export function nextOpenPick(players: Player[], totalPicks: number): number {
+export function occupiedPickNumbers(players: Player[], skippedPicks: number[] = []): Set<number> {
   const used = usedPickNumbers(players);
+  for (const pick of skippedPicks) {
+    if (pick > 0) used.add(pick);
+  }
+  return used;
+}
+
+export function nextOpenPick(
+  players: Player[],
+  totalPicks: number,
+  skippedPicks: number[] = [],
+): number {
+  const used = occupiedPickNumbers(players, skippedPicks);
   const limit = Math.max(1, totalPicks);
   for (let pick = 1; pick <= limit; pick += 1) {
     if (!used.has(pick)) return pick;
@@ -92,7 +104,7 @@ export function nextOpenPick(players: Player[], totalPicks: number): number {
 
 export function ourUpcomingPicks(session: DraftSession, count = 6): number[] {
   const total = maxPicks(session);
-  const used = usedPickNumbers(session.players);
+  const used = occupiedPickNumbers(session.players, session.skippedPicks ?? []);
   const picks: number[] = [];
 
   for (let pick = 1; pick <= total && picks.length < count; pick += 1) {
