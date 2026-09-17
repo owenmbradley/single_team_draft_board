@@ -121,7 +121,7 @@ describe('parsePlayerRows', () => {
     ]);
 
     expect(result.players).toHaveLength(1);
-    expect(result.players[0]).toMatchObject({ name: 'Pat Lee', talent: 3, vibes: 3, position: 'Skater' });
+    expect(result.players[0]).toMatchObject({ name: 'Pat Lee', talent: 0, vibes: 0, position: 'Skater' });
     expect(result.warnings.some((warning) => warning.includes('talent'))).toBe(true);
   });
 

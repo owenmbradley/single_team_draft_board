@@ -5664,9 +5664,9 @@ function createId() {
 }
 
 // api/_lib/ratings.ts
-var MIN_RATING = 1;
+var MIN_RATING = 0;
 var MAX_RATING = 5;
-var DEFAULT_RATING = 3;
+var DEFAULT_RATING = 0;
 var MAX_TOTAL = MAX_RATING * 2;
 var RATING_PRECISION = 10;
 function clampRating(value) {

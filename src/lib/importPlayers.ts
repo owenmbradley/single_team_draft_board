@@ -68,8 +68,8 @@ export function parsePlayerRows(rows: Record<string, unknown>[]): Omit<ImportRes
   const seen = new Map<string, number>();
   const players: ParsedPlayer[] = [];
 
-  if (!talentKey) warnings.push('No talent column found. Defaulted new players to 3.');
-  if (!vibesKey) warnings.push('No vibes column found. Defaulted new players to 3.');
+  if (!talentKey) warnings.push('No talent column found. Defaulted new players to 0.');
+  if (!vibesKey) warnings.push('No vibes column found. Defaulted new players to 0.');
   if (!positionKey) warnings.push('No position column found. Defaulted players to Skater.');
 
   rows.forEach((row, index) => {

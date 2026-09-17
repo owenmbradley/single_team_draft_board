@@ -17,17 +17,20 @@ describe('ratings', () => {
     expect(formatOverall(4.5, 3.2)).toBe('7.7/10');
   });
 
-  it('keeps one decimal on the 1-5 scale', () => {
-    expect(clampRating(0)).toBe(1);
+  it('keeps one decimal on the 0-5 scale', () => {
+    expect(clampRating(-1)).toBe(0);
+    expect(clampRating(0)).toBe(0);
     expect(clampRating(9)).toBe(5);
     expect(clampRating(3.24)).toBe(3.2);
     expect(clampRating(3.25)).toBe(3.3);
-    expect(clampRating(Number.NaN)).toBe(3);
+    expect(clampRating(Number.NaN)).toBe(0);
+    expect(formatRating(0)).toBe('0');
     expect(formatRating(4)).toBe('4');
     expect(formatRating(4.5)).toBe('4.5');
   });
 
   it('fills rating circles in proportion to the decimal', () => {
+    expect(pipFill(0, 0)).toBe(0);
     expect(pipFill(3.7, 0)).toBe(1);
     expect(pipFill(3.7, 2)).toBe(1);
     expect(pipFill(3.7, 3)).toBeCloseTo(0.7);

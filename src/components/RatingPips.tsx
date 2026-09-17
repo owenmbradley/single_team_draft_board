@@ -12,7 +12,7 @@ export function RatingPips({ value, onChange, label }: RatingPipsProps) {
   const circles = (
     <div className="flex items-center gap-1" aria-hidden={Boolean(onChange)}>
       {Array.from({ length: MAX_RATING }, (_, index) => {
-        const pipValue = index + MIN_RATING;
+        const pipValue = index + 1;
         const fill = pipFill(rating, index);
         if (!onChange) {
           return <RatingCircle key={pipValue} fill={fill} size="sm" />;

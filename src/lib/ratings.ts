@@ -1,8 +1,8 @@
 import type { Position } from '../types';
 
-export const MIN_RATING = 1;
+export const MIN_RATING = 0;
 export const MAX_RATING = 5;
-export const DEFAULT_RATING = 3;
+export const DEFAULT_RATING = 0;
 export const RATING_STEP = 0.1;
 export const MAX_TOTAL = MAX_RATING * 2;
 
