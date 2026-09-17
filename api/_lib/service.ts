@@ -18,6 +18,7 @@ const ALLOWED_ACTIONS = new Set<SessionAction['type']>([
   'markCaptain',
   'assignOutsideDraft',
   'restorePlayer',
+  'deletePlayer',
   'resetPicks',
   'clearPlayers',
   'undo',

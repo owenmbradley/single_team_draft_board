@@ -1,4 +1,4 @@
-import { ShieldCheck, Undo2 } from 'lucide-react';
+import { ShieldCheck, Trash2, Undo2 } from 'lucide-react';
 import { RatingPips, TotalScore } from '@/components/RatingPips';
 import { inputClass, primaryButtonClass, secondaryButtonClass } from '@/components/Dialog';
 import { formatOverall, overall } from '@/lib/ratings';
@@ -19,6 +19,7 @@ type RosterPanelProps = {
   onMarkCaptain: (id: string) => void;
   onAssignOutsideDraft: (id: string) => void;
   onRestore: (id: string) => void;
+  onDelete: (id: string) => void;
   onSelect: (id: string) => void;
   onEdit: (id: string, patch: Partial<PlayerInput>) => void;
 };
@@ -37,6 +38,7 @@ export function RosterPanel({
   onMarkCaptain,
   onAssignOutsideDraft,
   onRestore,
+  onDelete,
   onSelect,
   onEdit,
 }: RosterPanelProps) {
@@ -161,6 +163,14 @@ export function RosterPanel({
                 <button type="button" className={secondaryButtonClass} onClick={() => onMarkCaptain(selected.id)}>
                   Mark as captain
                 </button>
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-coral/30 px-4 text-sm font-bold text-coral hover:bg-[#fff0ed]"
+                  onClick={() => onDelete(selected.id)}
+                >
+                  <Trash2 className="size-4" />
+                  Remove from draft
+                </button>
               </div>
             )}
             {selected.status !== 'available' && (
@@ -176,6 +186,14 @@ export function RosterPanel({
                 <button type="button" className={`${secondaryButtonClass} w-full`} onClick={() => onRestore(selected.id)}>
                   <Undo2 className="size-4" />
                   Return to available
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-coral/30 px-4 text-sm font-bold text-coral hover:bg-[#fff0ed]"
+                  onClick={() => onDelete(selected.id)}
+                >
+                  <Trash2 className="size-4" />
+                  Remove from draft
                 </button>
               </div>
             )}

@@ -487,6 +487,19 @@ export default function App() {
               onRestore={(id) => {
                 commit({ type: 'restorePlayer', playerId: id });
               }}
+              onDelete={(id) => {
+                const player = session.players.find((item) => item.id === id);
+                const name = player?.name ?? 'this player';
+                if (
+                  !window.confirm(
+                    `Remove ${name} from this draft permanently? If they already had a pick, that slot is skipped for the live draft and can be filled later by manual assignment.`,
+                  )
+                ) {
+                  return;
+                }
+                commit({ type: 'deletePlayer', playerId: id });
+                setSelectedId(null);
+              }}
               onSelect={selectPlayer}
               onEdit={(id, patch) => commit({ type: 'editPlayer', id, input: patch })}
             />

@@ -345,4 +345,27 @@ describe('draft session', () => {
     expect(store.session.players[0].status).toBe('available');
     expect(store.session.currentPick).toBe(1);
   });
+
+  it('deletes a drafted player without snapping the clock back to their slot', () => {
+    let store = createStore();
+    store = reduceSession(store, { type: 'addPlayer', input: miles });
+    store = reduceSession(store, { type: 'addPlayer', input: pat });
+    store = reduceSession(store, {
+      type: 'recordPick',
+      playerId: store.session.players[0].id,
+      teamId: store.session.teams[0].id,
+    });
+    store = reduceSession(store, {
+      type: 'recordPick',
+      playerId: store.session.players[1].id,
+      teamId: store.session.teams[1].id,
+    });
+    expect(store.session.currentPick).toBe(3);
+
+    const deletedId = store.session.players[0].id;
+    store = reduceSession(store, { type: 'deletePlayer', playerId: deletedId });
+    expect(store.session.players.map((player) => player.name)).toEqual(['Pat Lee']);
+    expect(store.session.skippedPicks).toEqual([1]);
+    expect(store.session.currentPick).toBe(3);
+  });
 });

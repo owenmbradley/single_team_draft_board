@@ -5999,6 +5999,18 @@ function reduceSession(store, action) {
           } : player
         )
       });
+    case "deletePlayer": {
+      const player = session.players.find((item) => item.id === action.playerId);
+      if (!player) return store;
+      const skippedPicks = normalizeSkippedPicks(session.skippedPicks);
+      const vacatedPick = player.pickNumber;
+      const nextSkipped = vacatedPick != null && !skippedPicks.includes(vacatedPick) ? [...skippedPicks, vacatedPick].sort((a, b) => a - b) : skippedPicks;
+      return snapshot(store, {
+        ...session,
+        players: session.players.filter((item) => item.id !== action.playerId),
+        skippedPicks: nextSkipped
+      });
+    }
     case "resetPicks":
       return snapshot(store, {
         ...session,
@@ -6027,6 +6039,7 @@ var ALLOWED_ACTIONS = /* @__PURE__ */ new Set([
   "markCaptain",
   "assignOutsideDraft",
   "restorePlayer",
+  "deletePlayer",
   "resetPicks",
   "clearPlayers",
   "undo"

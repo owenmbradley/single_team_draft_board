@@ -38,6 +38,7 @@ export type SessionAction =
   | { type: 'markCaptain'; playerId: string; teamId: string }
   | { type: 'assignOutsideDraft'; playerId: string; teamId: string }
   | { type: 'restorePlayer'; playerId: string }
+  | { type: 'deletePlayer'; playerId: string }
   | { type: 'resetPicks' }
   | { type: 'clearPlayers' }
   | { type: 'undo' };
@@ -417,6 +418,21 @@ export function reduceSession(store: SessionStore, action: SessionAction): Sessi
             : player,
         ),
       });
+    case 'deletePlayer': {
+      const player = session.players.find((item) => item.id === action.playerId);
+      if (!player) return store;
+      const skippedPicks = normalizeSkippedPicks(session.skippedPicks);
+      const vacatedPick = player.pickNumber;
+      const nextSkipped =
+        vacatedPick != null && !skippedPicks.includes(vacatedPick)
+          ? [...skippedPicks, vacatedPick].sort((a, b) => a - b)
+          : skippedPicks;
+      return snapshot(store, {
+        ...session,
+        players: session.players.filter((item) => item.id !== action.playerId),
+        skippedPicks: nextSkipped,
+      });
+    }
     case 'resetPicks':
       return snapshot(store, {
         ...session,
