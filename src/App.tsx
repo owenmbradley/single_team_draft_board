@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ClipboardList, Download, LogOut, PenLine, Plus, Settings2, Undo2, Upload, Users } from 'lucide-react';
 import { AddPlayerDialog } from '@/components/AddPlayerDialog';
 import { AvailableList } from '@/components/AvailableList';
@@ -21,6 +21,7 @@ import { readRoom, type RoomPayload } from '@/lib/roomsApi';
 import { maxPicks, ourUpcomingPicks, teamForPick } from '@/lib/draftOrder';
 import { parsePlayerWorkbook } from '@/lib/importPlayers';
 import {
+  applyStablePlayerOrder,
   filterPlayers,
   classYearOptions,
   defaultSortDir,
@@ -62,6 +63,7 @@ export default function App() {
   );
   const [room, setRoom] = useState<RoomConnection | null>(null);
   const { commit, setVersion } = useRoomSync(room, dispatch);
+  const planOrderRef = useRef<{ controls: string; ids: string[] } | null>(null);
 
   useEffect(() => {
     const existing = loadRoomConnection();
@@ -86,18 +88,40 @@ export default function App() {
     };
   }, [setVersion]);
 
-  const listed = useMemo(
+  const playerIdsKey = session.players.map((player) => player.id).join('\0');
+  const planListControls = useMemo(
     () =>
-      filterPlayers(session.players, {
+      JSON.stringify({
         query,
         position,
         classYear,
-        status: view === 'plan' ? 'all' : pool,
         sortKey,
         sortDir,
+        ids: playerIdsKey,
       }),
-    [session.players, query, position, classYear, pool, sortKey, sortDir, view],
+    [query, position, classYear, sortKey, sortDir, playerIdsKey],
   );
+
+  const listed = useMemo(() => {
+    const filtered = filterPlayers(session.players, {
+      query,
+      position,
+      classYear,
+      status: view === 'plan' ? 'all' : pool,
+      sortKey,
+      sortDir,
+    });
+    if (view !== 'plan') {
+      planOrderRef.current = null;
+      return filtered;
+    }
+    const prior = planOrderRef.current;
+    if (!prior || prior.controls !== planListControls) {
+      planOrderRef.current = { controls: planListControls, ids: filtered.map((player) => player.id) };
+      return filtered;
+    }
+    return applyStablePlayerOrder(filtered, prior.ids);
+  }, [session.players, query, position, classYear, pool, sortKey, sortDir, view, planListControls]);
   const classOptions = useMemo(() => classYearOptions(session.players), [session.players]);
 
   useEffect(() => {

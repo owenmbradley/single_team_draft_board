@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyStablePlayerOrder,
   classYearOptions,
   comparePlayers,
   defaultSortDir,
@@ -130,5 +131,19 @@ describe('player list filters', () => {
     expect(teamPicks(taken, 'team-1').map((item) => item.name)).toEqual(['Bo Hale']);
     expect(teamCaptains(taken, 'team-1').map((item) => item.name)).toEqual(['Cal Pike']);
     expect(teamAssigned(taken, 'team-1').map((item) => item.name)).toEqual(['Dee Moss']);
+  });
+
+  it('keeps a prior row order when ratings change', () => {
+    const ada = player('Ada', { talent: 5, vibes: 5 });
+    const bo = player('Bo', { talent: 2, vibes: 2 });
+    const prior = [bo.id, ada.id];
+    const next = applyStablePlayerOrder(
+      [
+        { ...ada, talent: 1 },
+        { ...bo, talent: 5 },
+      ],
+      prior,
+    );
+    expect(next.map((item) => item.name)).toEqual(['Bo', 'Ada']);
   });
 });

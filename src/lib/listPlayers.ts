@@ -84,6 +84,23 @@ export function filterPlayers(
     .sort((a, b) => comparePlayers(a, b, options.sortKey, options.sortDir));
 }
 
+/** Keep a prior row order when ratings change so Plan edits do not reshuffle mid-score. */
+export function applyStablePlayerOrder(players: Player[], priorIds: string[]): Player[] {
+  if (priorIds.length === 0) return players;
+  const byId = new Map(players.map((player) => [player.id, player]));
+  const ordered: Player[] = [];
+  for (const id of priorIds) {
+    const player = byId.get(id);
+    if (!player) continue;
+    ordered.push(player);
+    byId.delete(id);
+  }
+  for (const player of players) {
+    if (byId.has(player.id)) ordered.push(player);
+  }
+  return ordered;
+}
+
 export function rosterCounts(players: Player[], ourTeamId?: string): { skaters: number; goalies: number } {
   const mine = players.filter(
     (player) =>

@@ -401,11 +401,22 @@ describe('draft board app', () => {
       talent.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
     });
 
+    const vibes = container.querySelector('input[aria-label="Miles Irwin vibes"]');
+    if (!(vibes instanceof HTMLInputElement)) throw new Error('missing vibes');
+    await act(async () => {
+      setInputValue(vibes, '4.5');
+      vibes.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+    });
+
     const notes = container.querySelector('input[aria-label="Miles Irwin notes"]');
     if (!(notes instanceof HTMLInputElement)) throw new Error('missing notes');
     await act(async () => {
       setInputValue(notes, 'First round lock');
     });
+
+    // Row must still be present after both scores — plan list does not reshuffle on rating edits.
+    expect(container.querySelector('input[aria-label="Miles Irwin talent"]')).toBeTruthy();
+    expect(container.querySelector('input[aria-label="Miles Irwin vibes"]')).toBeTruthy();
 
     const back = Array.from(container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Back to draft'),
@@ -434,6 +445,9 @@ describe('draft board app', () => {
     const draftTalent = container.querySelector('input[aria-label="Talent"]');
     if (!(draftTalent instanceof HTMLInputElement)) throw new Error('missing selected talent');
     expect(draftTalent.value).toBe('2.5');
+    const draftVibes = container.querySelector('input[aria-label="Vibes"]');
+    if (!(draftVibes instanceof HTMLInputElement)) throw new Error('missing selected vibes');
+    expect(draftVibes.value).toBe('4.5');
   });
 
   it('opens planning after an import', async () => {
